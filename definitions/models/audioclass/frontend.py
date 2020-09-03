@@ -114,6 +114,55 @@ class Pow(nn.Module):
         return 'trainable={}'.format(repr(self.trainable))
 
 
+class PCEN(nn.Module):
+    """
+    Trainable PCEN (Per-Channel Energy Normalization) layer:
+    .. math::
+        Y = (\\frac{X}{(\\epsilon + M)^\\alpha} + \\delta)^r - \\delta^r
+        M_t = (1 - s) M_{t - 1} + s X_t
+    Assumes spectrogram input of shape ``(batchsize, channels, bands, time)``.
+    Implements an automatic gain control through the division by :math:`M`, an
+    IIR filter estimating the local magnitude, followed by root compression.
+    As proposed in https://arxiv.org/abs/1607.05666, all parameters are
+    trainable, and learned separately per frequency band. In contrast to the
+    paper, the smoother :math:`M` is learned by backpropagating through the
+    recurrence relation to tune :math:`s`, not by mixing a set of predefined
+    smoothers.
+    """
+    def __init__(self, num_bands,
+                 s=0.025,
+                 alpha=1.,
+                 delta=1.,
+                 r=1.,
+                 eps=1e-6,
+                 init_smoother_from_data=True):
+        super(PCEN, self).__init__()
+        self.log_s = nn.Parameter(torch.full((num_bands,), np.log(s)))
+        self.log_alpha = nn.Parameter(torch.full((num_bands,), np.log(alpha)))
+        self.log_delta = nn.Parameter(torch.full((num_bands,), np.log(delta)))
+        self.log_r = nn.Parameter(torch.full((num_bands,), np.log(r)))
+        self.eps = torch.as_tensor(eps)
+        self.init_smoother_from_data = init_smoother_from_data
+
+    def forward(self, x):
+        init = x[..., 0]  # initialize the filter with the first frame
+        if not self.init_smoother_from_data:
+            init = torch.zeros_like(init)  # initialize with zeros instead
+        s = self.log_s.exp()
+        smoother = [init]
+        for frame in range(1, x.shape[-1]):
+            smoother.append((1 - s) * smoother[-1] + s * x[..., frame])
+        smoother = torch.stack(smoother, -1)
+        alpha = self.log_alpha.exp()[:, np.newaxis]
+        delta = self.log_delta.exp()[:, np.newaxis]
+        r = self.log_r.exp()[:, np.newaxis]
+        # stable reformulation due to Vincent Lostanlen; original formula was:
+        # return (input / (self.eps + smoother)**alpha + delta)**r - delta**r
+        smoother = torch.exp(-alpha * (torch.log(self.eps) +
+                                       torch.log1p(smoother / self.eps)))
+        return (x * smoother + delta)**r - delta**r
+
+
 class STFT(Module):
     def __init__(self, winsize, hopsize, complex=False):
         super(STFT, self).__init__()
@@ -304,6 +353,8 @@ def create(cfg, shapes, dtypes, num_classes):
         network.add_module('magscale', Pow(
                 a=np.log(a / (1 - a)),
                 trainable=cfg['spect.magscale'].startswith('powx')))
+    elif cfg['spect.magscale'] == 'pcen':
+        network.add_module('magscale', PCEN(num_bands))
     else:
         raise ValueError("unknown spect.magscale '%s'" % cfg['spect.magscale'])
     if cfg['spect.norm'] == 'batchnorm':
