@@ -17,7 +17,7 @@ Prerequisites
 You will need Python 3 with at least the following modules:
 * numpy
 * scikit-learn
-* torch>=1.6
+* torch>=1.5.1
 * tqdm
 * pandas
 
@@ -37,7 +37,7 @@ conda install numpy scikit-learn tqdm pandas matplotlib
 ```
 
 Pytorch should be installed following the instructions on
-[pytorch.org](https://pytorch.org). You will need Pytorch 1.6 or later.
+[pytorch.org](https://pytorch.org). You will need Pytorch 1.5.1 or later.
 
 Tensorboard can be installed with `pip3 install tensorboard` or
 `conda install -c conda-forge tensorboard`.

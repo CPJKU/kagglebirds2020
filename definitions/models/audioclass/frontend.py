@@ -18,6 +18,41 @@ import torch.nn.functional as F
 from .. import ReceptiveField
 
 
+if torch.__version__ < '1.6':
+    class Module(nn.Module):
+        """
+        A torch.nn.Module subclass that allows to register non-persistent buffers.
+        """
+        def __init__(self):
+            super(Module, self).__init__()
+            self._nonpersistent_buffers = set()
+
+        def register_buffer(self, name, tensor, persistent=True):
+            super(Module, self).register_buffer(name, tensor)
+            if not persistent:
+                self._nonpersistent_buffers.add(name)
+
+        def state_dict(self, destination=None, prefix='', keep_vars=False):
+            result = super(Module, self).state_dict(destination, prefix, keep_vars)
+            # remove non-persistent buffers
+            for k in self._nonpersistent_buffers:
+                del result[prefix + k]
+            return result
+
+        def _load_from_state_dict(self, state_dict, prefix, *args, **kwargs):
+            # temporarily hide the non-persistent buffers
+            persistent_buffers = {k: v for k, v in self._buffers.items()
+                                if k not in self._nonpersistent_buffers}
+            all_buffers = self._buffers
+            self._buffers = persistent_buffers
+            result = super(Module, self)._load_from_state_dict(state_dict, prefix, *args, **kwargs)
+            self._buffers = all_buffers
+            return result
+else:
+    # PyTorch 1.6+ supports non-persistent buffers out of the box
+    Module = nn.Module
+
+
 class TemporalBatchNorm(nn.Module):
     """
     Batch normalization of a (batch, channels, bands, time) tensor over all but
@@ -79,7 +114,7 @@ class Pow(nn.Module):
         return 'trainable={}'.format(repr(self.trainable))
 
 
-class STFT(nn.Module):
+class STFT(Module):
     def __init__(self, winsize, hopsize, complex=False):
         super(STFT, self).__init__()
         self.winsize = winsize
@@ -153,7 +188,7 @@ def create_mel_filterbank(sample_rate, frame_len, num_bands, min_freq, max_freq,
     return filterbank
 
 
-class MelFilter(nn.Module):
+class MelFilter(Module):
     def __init__(self, sample_rate, winsize, num_bands, min_freq, max_freq):
         super(MelFilter, self).__init__()
         melbank = create_mel_filterbank(sample_rate, winsize, num_bands,
