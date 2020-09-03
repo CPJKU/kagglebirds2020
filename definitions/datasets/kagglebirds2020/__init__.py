@@ -221,6 +221,18 @@ def find_files(basedir, regexp):
                   if regexp.match(fn))
 
 
+def derive_labelset(train_csv):
+    """
+    Returns the set of used ebird codes, sorted by latin names.
+    """
+    labelset_latin = sorted(set(train_csv.primary_label))
+    latin_to_ebird = dict(zip(train_csv.primary_label, train_csv.ebird_code))
+    labelset_ebird = [latin_to_ebird[latin] for latin in labelset_latin]
+    if len(set(labelset_ebird)) != len(labelset_ebird):
+        raise RuntimeError("Inconsistent latin names in train.csv!")
+    return labelset_ebird
+
+
 def make_multilabel_target(num_classes, classes):
     """
     Creates a k-hot vector of length `num_classes` with 1.0 at every index in
@@ -250,13 +262,9 @@ def create(cfg, designation):
                                          index_col='filename')
 
     # derive set of labels, ordered by latin names
-    labelset_latin = sorted(set(train_csv.primary_label))
-    latin_to_ebird = dict(zip(train_csv.primary_label, train_csv.ebird_code))
-    labelset_ebird = [latin_to_ebird[latin] for latin in labelset_latin]
-    if len(set(labelset_ebird)) != len(labelset_ebird):
-        raise RuntimeError("Inconsistent latin names in train.csv!")
+    labelset_ebird = derive_labelset(train_csv)
     ebird_to_idx = {ebird: idx for idx, ebird in enumerate(labelset_ebird)}
-    num_classes = len(labelset_latin)
+    num_classes = len(labelset_ebird)
 
     # for training and validation, read and convert all required labels
     if designation in ('train', 'valid'):
