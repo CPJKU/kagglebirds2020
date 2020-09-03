@@ -49,6 +49,16 @@ metrics=
 training="--var float16=1 --var float16.opt_level=O2"
 train 1 vanilla/f16 $data $model $metrics $training "$@"
 
+# trainable sharpness per class
+data="--var dataset=kagglebirds2020"
+model="--var model.global_pool=lmexxc:1"
+metrics=
+training=
+train 1 vanilla/lmexxc $data $model $metrics $training "$@"
+# same with float16
+training="--var float16=1 --var float16.opt_level=O2"
+train 1 vanilla/lmexxc_f16 $data $model $metrics $training "$@"
+
 # ...
 #data="--var dataset=kagglebirds2020"
 #model="--var model.predictor.arch=conv2d:16@3x3,bn2d,lrelu,..."
