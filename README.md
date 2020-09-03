@@ -44,8 +44,11 @@ Tensorboard can be installed with `pip3 install tensorboard` or
 
 Apex currently needs to be installed via pip (even when using conda):
 ```
-pip3 install -v --no-cache-dir --global-option="--cpp_ext" --global-option="--cuda_ext" https://github.com/NVIDIA/apex/archive/master.zip
+TORCH_CUDA_ARCH_LIST="6.1;7.5" pip3 install -v --no-cache-dir --global-option="--cpp_ext" --global-option="--cuda_ext" https://github.com/NVIDIA/apex/archive/master.zip
 ```
+`TORCH_CUDA_ARCH_LIST` lists the compute capabilities to compile for; it only
+needs to be set if the installation is shared across multiple machines with
+different GPUs (by default, it compiles for all GPUs on the current machine).
 
 Apart from Python, you will need `ffmpeg`. On Debian and Ubuntu, this can be
 installed with `sudo apt install ffmpeg libavcodec-extra`.
