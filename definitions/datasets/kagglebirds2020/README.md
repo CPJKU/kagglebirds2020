@@ -6,10 +6,12 @@ training clips and store them somewhere locally. The `collect_and_convert.sh`
 script helps with this. For example, you could do:
 
 ```bash
-mkdir -p ~/.localhost/data/kaggle_birds_wav
-ln -s ~/.localhost/data/kaggle_birds_wav audio
+ln -s /mnt/data/shared/birds_kaggle_2020_wav audio
+if [ ! -e audio ]; then
+mkdir -p /mnt/data/shared/birds_kaggle_2020_wav
 ./collect_and_convert.sh audio/train/official /share/cp/datasets/birds_kaggle_2020/official/train_audio/
 ./collect_and_convert.sh audio/train/xeno-canto /share/cp/datasets/birds_kaggle_2020/external/xeno-canto/
+fi
 ```
 
 The first command creates a symlink to some directory on a local disk, called
