@@ -66,6 +66,13 @@ metrics=
 training=
 train 1 vanilla/pcen $data $model $metrics $training "$@"
 
+# Weight loss by quality rating
+data="--var dataset=kagglebirds2020"
+model=
+metrics="--var metrics._ce.weight_name=rating"
+training=
+train 1 vanilla/ratingweight $data $model $metrics $training "$@"
+
 # ...
 #data="--var dataset=kagglebirds2020"
 #model="--var model.predictor.arch=conv2d:16@3x3,bn2d,lrelu,..."
