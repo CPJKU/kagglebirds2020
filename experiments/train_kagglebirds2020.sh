@@ -73,6 +73,14 @@ metrics="--var metrics._ce.weight_name=rating"
 training=
 train 1 vanilla/ratingweight $data $model $metrics $training "$@"
 
+# log1p magnitude scaling
+data="--var dataset=kagglebirds2020"
+model="--var spect.magscale=log1px"
+metrics=
+training=
+train 1 vanilla/log1px $data $model $metrics $training "$@"
+
+
 # ...
 #data="--var dataset=kagglebirds2020"
 #model="--var model.predictor.arch=conv2d:16@3x3,bn2d,lrelu,..."
