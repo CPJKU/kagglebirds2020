@@ -15,29 +15,31 @@ from .. import ReceptiveField
 from ..layers import SpatialLogMeanExp
 
 
-class GlobalMaxPool(nn.Module):
+class SpatialMaxPool(nn.Module):
     """
-    Performs global max pooling over the given dimension (the last by default).
+    Performs max pooling over spatial dimensions; keeps only the first `ndim`
+    dimensions of the input.
     """
-    def __init__(self, dim=-1):
-        super(GlobalMaxPool, self).__init__()
-        self.dim = dim
+    def __init__(self, ndim=2):
+        super(SpatialMaxPool, self).__init__()
+        self.ndim = ndim
 
     def forward(self, x):
-        max, argmax = x.max(dim=self.dim)
+        max, argmax = x.flatten(self.ndim).max(dim=-1)
         return max
 
 
-class GlobalMeanPool(nn.Module):
+class SpatialMeanPool(nn.Module):
     """
-    Performs global mean pooling over the given dimension (the last by default).
+    Performs mean pooling over spatial dimensions; keeps only the first `ndim`
+    dimensions of the input.
     """
-    def __init__(self, dim=-1):
-        super(GlobalMeanPool, self).__init__()
-        self.dim = dim
+    def __init__(self, ndim=2):
+        super(SpatialMeanPool, self).__init__()
+        self.ndim = ndim
 
     def forward(self, x):
-        return x.mean(dim=self.dim)
+        return x.mean(tuple(range(self.ndim, x.ndim)))
 
 
 class LocalPool(nn.Module):
@@ -91,9 +93,9 @@ def create(cfg, shapes, dtypes, num_classes):
     Instantiates a backend for the given data shapes and dtypes.
     """
     if cfg.get('model.global_pool', 'max') == 'max':
-        pool = GlobalMaxPool()
+        pool = SpatialMaxPool()
     elif cfg['model.global_pool'] == 'mean':
-        pool = GlobalMeanPool()
+        pool = SpatialMeanPool()
     elif cfg['model.global_pool'].startswith('lme'):
         pool_args = cfg['model.global_pool'].split(':', 1)
         sharpness = float(pool_args[1]) if len(pool_args) > 1 else 1
