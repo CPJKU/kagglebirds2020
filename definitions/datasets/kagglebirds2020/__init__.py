@@ -38,15 +38,19 @@ class BirdcallDataset(Dataset):
         shapes = dict(input=common_shape(wavs), itemid=())
         dtypes = dict(input=wavs[0].dtype, itemid=str)
         num_classes = len(labelset)
-        if annotations is not None and ('label_fg' in annotations):
-            shapes['label_fg'] = ()
-            dtypes['label_fg'] = np.uint8
-        if annotations is not None and ('label_bg' in annotations):
-            shapes['label_bg'] = (num_classes,)
-            dtypes['label_bg'] = np.uint8
-        if annotations is not None and ('label_all' in annotations):
-            shapes['label_all'] = (num_classes,)
-            dtypes['label_all'] = np.float32
+        if annotations is not None:
+            if 'label_fg' in annotations:
+                shapes['label_fg'] = ()
+                dtypes['label_fg'] = np.uint8
+            if 'label_bg' in annotations:
+                shapes['label_bg'] = (num_classes,)
+                dtypes['label_bg'] = np.uint8
+            if 'label_all' in annotations:
+                shapes['label_all'] = (num_classes,)
+                dtypes['label_all'] = np.float32
+            if 'rating' in annotations:
+                shapes['rating'] = ()
+                dtypes['rating'] = np.float32
         super(BirdcallDataset, self).__init__(
             shapes=shapes,
             dtypes=dtypes,
@@ -62,8 +66,8 @@ class BirdcallDataset(Dataset):
         # get audio
         item = dict(itemid=self.itemids[idx], input=self.wavs[idx])
         # get targets, if any
-        for key in 'label_fg', 'label_bg', 'label_all':
-            if key in self.shapes:
+        for key in self.shapes:
+            if key not in item:
                 item[key] = self.annotations[key][idx]
         # return
         return item
@@ -351,6 +355,9 @@ def create(cfg, designation):
     audios = [audio.WavFile(fn, sample_rate=sample_rate)
               for fn in tqdm.tqdm(audio_files, 'Reading audio',
                                   ascii=bool(cfg['tqdm.ascii']))]
+
+    # prepare annotations
+    train_csv.rating = train_csv.rating.astype(np.float32)
 
     # create the dataset
     dataset = BirdcallDataset(itemids, audios, labelset_ebird,
