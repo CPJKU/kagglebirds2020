@@ -14,7 +14,7 @@ logdir="$here/../logs/kagglebirds2020"
 train_if_free() {
 	modelfile="$1"
 	echo "$modelfile"
-	#logsubdir="$logdir/${modelfile%.*}"  # tensorboard disabled for now
+	logsubdir="$logdir/${modelfile%.*}"
 	modelfile="$outdir/$modelfile"
 	mkdir -p "${modelfile%/*}"
 	if [ ! -f "$modelfile" ] && [ ! -f "$modelfile.lock" ]; then
