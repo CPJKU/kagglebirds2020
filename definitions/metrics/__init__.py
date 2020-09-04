@@ -249,6 +249,64 @@ def categorical_accuracy(preds, targets, pred_name='output', target_name='map',
             return spatial_mean(correct.float())
 
 
+def categorical_mean_average_precision(preds, targets, pred_name='output',
+                                       target_name='map'):
+    """
+    Computes the mean average precision from predictions given as logits, for a
+    categorical segmentation task.
+    """
+    preds = preds[pred_name]
+    gt = targets[target_name]
+    # order classes by predicted probability
+    top_predictions = torch.argsort(preds, -1, descending=True)
+    # find the correct class in there
+    top_correct = (top_predictions == gt[..., None])
+    # determine the rank of the correct class (requires conversion from bool)
+    rank = top_correct.byte().argmax(-1)
+    # the average of the inverse ranks is the mean average precision
+    # (but averaging over the batch items happens outside of this)
+    return (1. / (1 + rank))
+
+
+def binary_precision(preds, targets, pred_name='output', target_name='mask'):
+    """
+    Computes the precision from predictions given as logits, for a binary
+    classification task.
+    """
+    preds = preds[pred_name]
+    gt = (targets[target_name] > 0)
+    preds = (preds > 0)
+    true_positives = spatial_sum(gt & preds)
+    predicted_positives = spatial_sum(preds)
+    return true_positives.float(), predicted_positives.float()
+
+
+def binary_recall(preds, targets, pred_name='output', target_name='mask'):
+    """
+    Computes the recall from predictions given as logits, for a binary
+    classification task.
+    """
+    preds = preds[pred_name]
+    gt = (targets[target_name] > 0)
+    preds = (preds > 0)
+    true_positives = spatial_sum(gt & preds)
+    labeled_positives = spatial_sum(gt)
+    return true_positives.float(), labeled_positives.float()
+
+
+def binary_specificity(preds, targets, pred_name='output', target_name='mask'):
+    """
+    Computes the specificity (= recall of negative class) from predictions
+    given as logits, for a binary classification task.
+    """
+    preds = preds[pred_name]
+    gt = (targets[target_name] == 0)
+    preds = (preds < 0)
+    true_negatives = spatial_sum(gt & preds)
+    labeled_negatives = spatial_sum(gt)
+    return true_negatives.float(), labeled_negatives.float()
+
+
 class AggregatedFraction(object):
     """
     Helper class to compute a weighted average.
