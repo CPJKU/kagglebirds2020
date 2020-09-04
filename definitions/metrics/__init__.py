@@ -106,6 +106,9 @@ def binary_crossentropy(preds, targets, pred_name='output', target_name='mask',
         valid = (gt != 255).float()
     gt = gt.float()
     weight = weight_name and targets.get(weight_name)
+    if weight is not None and weight.ndim < gt.ndim:
+        # append singleton dimensions to make sure the batch dimensions line up
+        weight = weight.view(weight.shape + (1,) * (gt.ndim - weight.ndim))
     not_batch = tuple(range(1, gt.dim()))
     if ignore is not None and ignore >= 0:
         return F.binary_cross_entropy_with_logits(
@@ -131,6 +134,9 @@ def categorical_crossentropy(preds, targets, pred_name='output',
     """
     gt = targets[target_name]
     weight = weight_name and targets.get(weight_name)
+    if weight is not None and weight.ndim < gt.ndim:
+        # append singleton dimensions to make sure the batch dimensions line up
+        weight = weight.view(weight.shape + (1,) * (gt.ndim - weight.ndim))
     not_batch = tuple(range(1, gt.dim()))
     preds = F.log_softmax(preds[pred_name], dim=1)
     if class_weights is not None:
