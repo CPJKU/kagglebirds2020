@@ -80,6 +80,13 @@ metrics=
 training=
 train 1 vanilla/log1px $data $model $metrics $training "$@"
 
+# global average instead of log-mean-exp
+data="--var dataset=kagglebirds2020"
+model="--var model.global_pool=mean"
+metrics=
+training=
+train 1 vanilla/meanpool $data $model $metrics $training "$@"
+
 
 # ...
 #data="--var dataset=kagglebirds2020"
