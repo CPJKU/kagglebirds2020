@@ -40,7 +40,7 @@ data="--var dataset=kagglebirds2020"
 model=
 metrics=
 training=
-train 1 vanilla/defaults $data $model $metrics $training "$@"
+train 3 vanilla/defaults $data $model $metrics $training "$@"
 
 # float16
 data="--var dataset=kagglebirds2020"
@@ -86,6 +86,24 @@ model="--var model.global_pool=mean"
 metrics=
 training=
 train 1 vanilla/meanpool $data $model $metrics $training "$@"
+
+# 5-second snippets
+data="--var dataset=kagglebirds2020 --var data.len_min=5 --var data.len_max=5"
+model=
+metrics=
+training=
+train 1 vanilla/len5 $data $model $metrics $training "$@"
+
+# 5-second snippets, increased batch size
+for batchsize in 32 64; do
+  data="--var dataset=kagglebirds2020 --var data.len_min=5 --var data.len_max=5 --var batchsize=$batchsize"
+  model=
+  metrics=
+  training=
+  train 1 vanilla/len5_bs${batchsize} $data $model $metrics $training "$@"
+done
+
+# shorter snippets with trained sharpness?
 
 
 # ...
