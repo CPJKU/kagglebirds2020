@@ -170,7 +170,10 @@ class TensorboardLogger(object):
                             self.writer.add_audio(prefix + k, v[0], epoch,
                                                   sample_rate=sample_rate)
                 if len(v.shape) == 4:
-                    if (v.shape[1] == 1 and
+                    if k == 'frontend':
+                        v = v[:, :1]
+                        v = (v - v.min()) / (v.max() - v.min())
+                    elif (v.shape[1] == 1 and
                             v.dtype.is_floating_point and
                             (v.max() > 1 or v.min() < 0)):
                         v = v.sigmoid()
@@ -200,7 +203,10 @@ class TensorboardLogger(object):
 
     def log_output(self, epoch=None):
         batch = next(self.get_batches(1))
-        preds = self.model(batch)
+        kwargs = {}
+        if hasattr(self.model, 'frontend'):
+            kwargs['extra_outputs'] = ['frontend']
+        preds = self.model(batch, **kwargs)
         self.log_data_dict(preds, 'output/', epoch)
 
     def log_erf(self, epoch=None, initial=False, num_batches=10):
