@@ -40,7 +40,7 @@ data="--var dataset=kagglebirds2020"
 model=
 metrics=
 training=
-train 3 vanilla/defaults $data $model $metrics $training "$@"
+train 7 vanilla/defaults $data $model $metrics $training "$@"
 
 # float16
 data="--var dataset=kagglebirds2020"
@@ -64,7 +64,7 @@ data="--var dataset=kagglebirds2020"
 model="--var spect.magscale=pcen"
 metrics=
 training=
-train 1 vanilla/pcen $data $model $metrics $training "$@"
+train 3 vanilla/pcen $data $model $metrics $training "$@"
 
 # Weight loss by quality rating
 data="--var dataset=kagglebirds2020"
