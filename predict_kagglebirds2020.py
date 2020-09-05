@@ -31,9 +31,10 @@ def opts_parser():
     descr = ("Compute bird classification predictions for submitting to "
              "Kaggle.")
     parser = ArgumentParser(description=descr)
-    parser.add_argument('modelfile', metavar='MODELFILE',
+    parser.add_argument('modelfile', metavar='MODELFILE', nargs='*',
             type=str,
-            help='File to load the learned weights from (.npz format)')
+            help='File to load the learned weights from (.npz format), can be '
+                 'given multiple times to average predictions.')
     parser.add_argument('outfile', metavar='OUTFILE',
             type=str,
             help='File to save the predictions to (.csv format)')
@@ -61,23 +62,34 @@ def opts_parser():
     return parser
 
 
-def pool_chunkwise(preds, times, clip_csv, model, labelset, threshold=0):
+def pool_chunkwise(preds, times, clip_csv, backend):
     chunks = []
-    for _, row in clip_csv.iterrows():
-        if row.site != 'site_3' and np.isfinite(row.seconds):
-            start = row.seconds - 5  # hard-coded for the challenge
-            end = row.seconds
+    for site, seconds in zip(clip_csv.site, clip_csv.seconds):
+        if site != 'site_3' and np.isfinite(seconds):
+            start = seconds - 5  # hard-coded for the challenge
+            end = seconds
             a, b = np.searchsorted(times, [start, end])
             chunk_preds = preds[..., a:b]
         else:
             chunk_preds = preds
         with torch.no_grad():
-            chunk_preds = model(chunk_preds).detach().cpu().numpy().ravel()
+            pooled = backend(chunk_preds).detach().cpu().numpy().ravel()
+        chunks.append(pooled)
+    return np.stack(chunks)
+
+
+def derive_labels(preds, clip_csv, labelset, threshold=0):
+    chunks = []
+    for row_id, chunk_preds in zip(clip_csv.row_id, preds):
         birds = np.where(chunk_preds > threshold)[0]
         birds = ' '.join(labelset[bird] for bird in birds) or 'nocall'
-        chunks.append({'row_id': row.row_id, 'birds': birds})
-    chunks = pd.DataFrame(chunks)
-    return chunks
+        chunks.append({'row_id': row_id, 'birds': birds})
+    return pd.DataFrame(chunks)
+
+
+def modelconfigfile(modelfile):
+    """Derive the file name of a model-specific config file"""
+    return os.path.splitext(modelfile)[0] + '.vars'
 
 
 def main():
@@ -86,10 +98,11 @@ def main():
     options = parser.parse_args()
     if not (options.train_csv and options.test_csv and options.test_audio):
         parser.error('requires --train-csv, --test-csv, --test-audio')
-    modelfile = options.modelfile
+    modelfiles = options.modelfile
     outfile = options.outfile
-    if os.path.exists(os.path.splitext(modelfile)[0] + '.vars'):
-        options.vars.insert(1, os.path.splitext(modelfile)[0] + '.vars')
+    if modelfiles:
+        if os.path.exists(modelconfigfile(modelfiles[0])):
+            options.vars.insert(1, modelconfigfile(modelfiles[0]))
     cfg = config.from_parsed_arguments(options)
     if not options.cuda_device:
         device = torch.device('cpu')
@@ -125,21 +138,39 @@ def main():
     labelset_ebird = derive_labelset(pd.read_csv(options.train_csv))
 
     # prepare model
-    print("Preparing network...")
+    print("Preparing %d network(s)..." % min(1, len(modelfiles)))
     # instantiate neural network
     num_classes = len(labelset_ebird)
-    model = get_model(cfg, shapes, dtypes, num_classes, options.cuda_device)
-    # restore state dict
-    if options.modelfile:
-        state_dict = torch.load(options.modelfile,
-                                map_location=device)
-        model.load_state_dict(state_dict)
-        del state_dict
-    else:
+    models = []
+    backends = []
+    if not modelfiles:
+        # no weights given: just instantiate a model and initialize it
+        model = get_model(cfg, shapes, dtypes, num_classes,
+                          options.cuda_device)
         init_model(model, cfg)
-    # take out the backend
-    model_backend = model.backend
-    model.backend = None
+        # take out the backend
+        model.train(False)
+        backends.append(model.backend)
+        model.backend = None
+        models.append(model)
+    else:
+        # read all the models
+        for modelfile in modelfiles:
+            # instantiate model according to its configuration file
+            model_cfg = dict(cfg)
+            model_cfg.update(config.parse_config_file(
+                    modelconfigfile(modelfile)))
+            model = get_model(model_cfg, shapes, dtypes, num_classes,
+                              options.cuda_device)
+            # restore state dict
+            state_dict = torch.load(modelfile, map_location=device)
+            model.load_state_dict(state_dict)
+            del state_dict
+            model.train(False)
+            # take out the backend
+            backends.append(model.backend)
+            model.backend = None
+            models.append(model)
 
     # configure binarization threshold
     threshold = options.threshold
@@ -148,31 +179,38 @@ def main():
 
     # run prediction loop
     print("Predicting:")
-    model.train(False)
-    model_backend.train(False)
     predictions = []
     for audio_id, wav in tqdm.tqdm(batches, 'File ', len(filelist)):
         wav = wav[np.newaxis]  # add batch dimension
-        # pass the batch to the network
-        with torch.no_grad():
-            preds = model(dict(input=wav))
-        # grab the main output
-        if isinstance(preds, dict):
-            if len(preds) == 1:
-                _, preds = preds.popitem()
-            else:
-                preds = preds['output']
-        # infer time step for every prediction frame
-        rf = model.receptive_field
-        offset = (rf.size[-1] // 2 - rf.padding[-1])
-        stride = rf.stride[-1]
-        times = np.arange(offset, wav.shape[-1] - offset, stride) / sample_rate
-        # we now have preds and matching times for a full audio recording, we
-        # need to evaluate it in chunks as specified in test.csv
-        clip_csv = test_csv.query("audio_id == '%s'" % audio_id)
-        pooled_preds = pool_chunkwise(preds, times, clip_csv, model_backend,
-                                      labelset_ebird, threshold)
-        predictions.append(pooled_preds)
+        preds_per_model = []
+        for model, backend in zip(models, backends):
+            # pass the batch to the network
+            with torch.no_grad():
+                preds = model(dict(input=wav))
+            # grab the main output
+            if isinstance(preds, dict):
+                if len(preds) == 1:
+                    _, preds = preds.popitem()
+                else:
+                    preds = preds['output']
+            # infer time step for every prediction frame
+            rf = model.receptive_field
+            offset = (rf.size[-1] // 2 - rf.padding[-1])
+            stride = rf.stride[-1]
+            times = (np.arange(offset, wav.shape[-1] - offset, stride) /
+                     sample_rate)
+            # we now have preds and matching times for a full audio recording,
+            # we need to evaluate it in chunks as specified in test.csv
+            clip_csv = test_csv.query("audio_id == '%s'" % audio_id)
+            preds = pool_chunkwise(preds, times, clip_csv, backend)
+            preds_per_model.append(preds)
+        # average predictions for all the models
+        preds = sum(preds_per_model[1:], preds_per_model[0])
+        if len(preds_per_model) > 1:
+            preds /= len(preds_per_model)
+        # turn probabilities to label lists
+        preds = derive_labels(preds, clip_csv, labelset_ebird, threshold)
+        predictions.append(preds)
 
     # save predictions
     print("Saving predictions")
