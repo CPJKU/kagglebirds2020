@@ -103,6 +103,16 @@ for batchsize in 32 64; do
   train 1 vanilla/len5_bs${batchsize} $data $model $metrics $training "$@"
 done
 
+# 10-, 15-, 20-second snippets with batch size 32
+for len in 10 15 20; do
+  data="--var dataset=kagglebirds2020 --var data.len_min=$len --var data.len_max=$len --var batchsize=32"
+  model=
+  metrics=
+  training=
+  train 1 vanilla/len${len}_bs32 $data $model $metrics $training "$@"
+done
+
+
 # shorter snippets with trained sharpness?
 
 
