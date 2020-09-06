@@ -112,6 +112,13 @@ for len in 10 15 20; do
   train 1 vanilla/len${len}_bs32 $data $model $metrics $training "$@"
 done
 
+# median subtraction
+data="--var dataset=kagglebirds2020"
+model="--var spect.denoise=submedian"
+metrics=
+training=
+train 1 vanilla/submedian $data $model $metrics $training "$@"
+
 
 # shorter snippets with trained sharpness?
 
