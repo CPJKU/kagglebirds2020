@@ -51,9 +51,13 @@ def opts_parser():
             type=float, default=0,
             help='Binarization threshold (default: %(default)s)')
     parser.add_argument('--threshold-convert',
-            type=str, choices=('none', 'logit'),
+            type=str, choices=('none', 'logit'), default='none',
             help='Optional function to apply to --threshold: none or logit '
                  '(to convert probabilities to logits) (default: %(default)s)')
+    parser.add_argument('--postprocess',
+            type=str, action='append', choices=('sigmoid',),
+            help='Postprocessing operation to apply (before bagging), can be '
+                 'given multiple times. Choices are: sigmoid')
     parser.add_argument('--cuda-device',
             type=int, action='append', default=[],
             help='If given, run on the given CUDA device (starting with 0). '
@@ -90,6 +94,18 @@ def derive_labels(preds, clip_csv, labelset, threshold=0):
 def modelconfigfile(modelfile):
     """Derive the file name of a model-specific config file"""
     return os.path.splitext(modelfile)[0] + '.vars'
+
+
+def postprocess(preds, methods):
+    """
+    Apply postprocessing `methods` to `preds` of shape (items, classes, time).
+    """
+    for method in methods:
+        if method == 'sigmoid':
+            preds = torch.as_tensor(preds).sigmoid().numpy()
+        else:
+            raise ValueError("Unknown postprocessing method %s" % method)
+    return preds
 
 
 def main():
@@ -203,6 +219,8 @@ def main():
             # we need to evaluate it in chunks as specified in test.csv
             clip_csv = test_csv.query("audio_id == '%s'" % audio_id)
             preds = pool_chunkwise(preds, times, clip_csv, backend)
+            # apply postprocessing
+            preds = postprocess(preds, options.postprocess)
             preds_per_model.append(preds)
         # average predictions for all the models
         preds = sum(preds_per_model[1:], preds_per_model[0])
