@@ -119,6 +119,14 @@ metrics=
 training=
 train 1 vanilla/submedian $data $model $metrics $training "$@"
 
+# different numbers of mel bands
+for mb in 120 160 200; do
+  data="--var dataset=kagglebirds2020"
+  model="--var filterbank.num_bands=$mb"
+  metrics=
+  training=
+  train 1 vanilla/mel${mb} $data $model $metrics $training "$@"
+done
 
 # shorter snippets with trained sharpness?
 
