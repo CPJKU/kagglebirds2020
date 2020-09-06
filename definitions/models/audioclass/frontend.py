@@ -163,6 +163,14 @@ class PCEN(nn.Module):
         return (x * smoother + delta)**r - delta**r
 
 
+class SubtractMedian(nn.Module):
+    """
+    Subtracts the median over the last axis.
+    """
+    def forward(self, x):
+        return x - x.median(-1, keepdim=True).values
+
+
 class STFT(Module):
     def __init__(self, winsize, hopsize, complex=False):
         super(STFT, self).__init__()
@@ -357,6 +365,12 @@ def create(cfg, shapes, dtypes, num_classes):
         network.add_module('magscale', PCEN(num_bands))
     else:
         raise ValueError("unknown spect.magscale '%s'" % cfg['spect.magscale'])
+    if cfg['spect.denoise'] == 'submedian':
+        network.add_module('denoise', SubtractMedian())
+    elif cfg['spect.denoise'] == 'none':
+        pass
+    else:
+        raise ValueError("unknown spect.denoise '%s'" % cfg['spect.denoise'])
     if cfg['spect.norm'] == 'batchnorm':
         network.add_module('norm', TemporalBatchNorm(num_bands))
     elif cfg['spect.norm'] == 'batchnorm_plain':
