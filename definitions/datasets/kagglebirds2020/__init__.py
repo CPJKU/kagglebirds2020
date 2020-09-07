@@ -307,8 +307,9 @@ def create(cfg, designation):
                 make_multilabel_target(num_classes,
                                        [latin_to_idx[latin]
                                         for latin in eval(labels)
-                                        if latin in latin_to_idx])
-                for labels in train_csv.secondary_labels]
+                                        if latin_to_idx.get(latin, fg) != fg])
+                for labels, fg in zip(train_csv.secondary_labels,
+                                      train_csv.label_fg)]
         weight_fg = cfg['data.label_fg_weight']
         weight_bg = cfg['data.label_bg_weight']
         label_fg_onehot = np.eye(num_classes,
