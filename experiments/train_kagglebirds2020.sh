@@ -144,6 +144,14 @@ metrics=
 training="--var train.first_params=frontend --var train.first_params.eta_scale=10"
 train 2 vanilla/pcen_frontend-eta10 $data $model $metrics $training "$@"
 
+# float16 with downmix augmentation
+data="--var dataset=kagglebirds2020 --var data.downmix=random_uniform"
+model=
+metrics=
+training="--var float16=1 --var float16.opt_level=O2"
+train 1 vanilla/rnddownmix_f16 $data $model $metrics $training "$@"
+
+
 # shorter snippets with trained sharpness?
 
 
