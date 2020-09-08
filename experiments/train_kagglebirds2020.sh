@@ -170,8 +170,17 @@ data="--var dataset=kagglebirds2020 --var data.downmix=random_uniform"
 model="--var spect.denoise=submedian --var model.predictor.arch=add[conv2d:64@3x3,bn2d,relu,conv2d:64@3x3|crop2d:2,conv2d:64@1x1],add[bn2d,relu,conv2d:64@3x3,bn2d,relu,conv2d:64@3x3|crop2d:2],pool2d:max@3x3,add[bn2d,relu,conv2d:128@3x3,bn2d,relu,conv2d:128@3x3|crop2d:2,conv2d:128@1x1],add[bn2d,relu,conv2d:128@3x3,bn2d,relu,conv2d:128@3x3|crop2d:2],bn2d,relu,conv2d:128@12x3,bn2d,lrelu,pool2d:max@5x3,conv2d:1024@1x9,bn2d,lrelu,dropout:0.5,conv2d:1024@1x1,bn2d,lrelu,dropout:0.5,conv2d:C@1x1"
 metrics=
 training="--var float16=1 --var float16.opt_level=O2"
-train 2 vanilla/submedian_rnddownmix_f16 $data $model $metrics $training "$@"
+train 2 resnet1/submedian_rnddownmix_f16 $data $model $metrics $training "$@"
 
+# float16 different context with median subtraction and downmix augmentation
+for ctx in 3 5 7 11 13 15 17; do
+data="--var dataset=kagglebirds2020 --var data.downmix=random_uniform"
+model="--var spect.denoise=submedian --var model.predictor.arch=conv2d:64@3x3,bn2d,lrelu,conv2d:64@3x3,bn2d,pool2d:max@3x3,lrelu,conv2d:128@3x3,bn2d,lrelu,conv2d:128@3x3,bn2d,lrelu,conv2d:128@17x3,bn2d,pool2d:max@5x3,lrelu,conv2d:1024@1x$ctx,bn2d,lrelu,dropout:0.5,conv2d:1024@1x1,bn2d,lrelu,dropout:0.5,conv2d:C@1x1"
+metrics=
+training="--var float16=1 --var float16.opt_level=O2"
+train 1 vanilla/submedian_rnddownmix_ctx${ctx}_f16 $data $model $metrics $training "$@"
+
+done
 
 # shorter snippets with trained sharpness?
 
