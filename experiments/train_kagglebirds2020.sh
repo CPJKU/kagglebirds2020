@@ -137,6 +137,13 @@ for fps in 30 50 63 90 105; do
   train 1 vanilla/fps${fps} $data $model $metrics $training "$@"
 done
 
+# PCEN with increased frontend learning rate
+data="--var dataset=kagglebirds2020"
+model="--var spect.magscale=pcen"
+metrics=
+training="--var train.first_params=frontend --var train.first_params.eta_scale=10"
+train 2 vanilla/pcen_frontend-eta10 $data $model $metrics $training "$@"
+
 # shorter snippets with trained sharpness?
 
 
