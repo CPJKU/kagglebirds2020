@@ -223,15 +223,15 @@ def custom_cnn(input_channels, specification, input_name='input',
                                             keepdim=True, **params))
             # we do not adjust the receptive field; it spans the whole input
         elif kind == 'bn1d':
-            if hasattr(layers[-1], 'bias'):
+            if len(layers) >= 1 and hasattr(layers[-1], 'bias'):
                 layers[-1].register_parameter('bias', None)
-            elif hasattr(layers[-2], 'bias'):
+            elif len(layers) >=2 and hasattr(layers[-2], 'bias'):
                 layers[-2].register_parameter('bias', None)
             layers.append(nn.BatchNorm1d(input_channels))
         elif kind == 'bn2d':
-            if hasattr(layers[-1], 'bias'):
+            if len(layers) >= 1 and hasattr(layers[-1], 'bias'):
                 layers[-1].register_parameter('bias', None)
-            elif hasattr(layers[-2], 'bias'):
+            elif len(layers) >= 2 and hasattr(layers[-2], 'bias'):
                 layers[-2].register_parameter('bias', None)
             layers.append(nn.BatchNorm2d(input_channels))
         elif kind == 'dropout':
