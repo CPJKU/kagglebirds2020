@@ -28,6 +28,7 @@ from definitions import (get_dataset,
                          get_dataloader,
                          get_model)
 from definitions.datasets import (Dataset,
+                                  apply_to_collection,
                                   iterate_data,
                                   print_data_info)
 from definitions.models import print_model_info, init_model
@@ -102,6 +103,16 @@ def compute_erf(model, batches, input_name='input'):
     """
     model.train(False)
     if hasattr(model, 'predictor') and hasattr(model, 'frontend'):
+        if model.forward.__module__.startswith('apex'):
+            # need to reinsert float16 conversion if we tear apart the model
+            def to_float16(self, inputs):
+                return apply_to_collection(
+                        inputs, lambda x: (x.half()
+                                           if x.dtype.is_floating_point
+                                           else x))
+
+            for m in (model.frontend, model.predictor):
+                m.register_forward_pre_hook(to_float16)
         frontend = model.frontend
         model = model.predictor
     else:
