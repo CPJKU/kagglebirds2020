@@ -158,6 +158,13 @@ metrics=
 training="--var float16=1 --var float16.opt_level=O2"
 train 2 vanilla/submedian_f16 $data $model $metrics $training "$@"
 
+# float16 with median subtraction and downmix augmentation
+data="--var dataset=kagglebirds2020 --var data.downmix=random_uniform"
+model="--var spect.denoise=submedian"
+metrics=
+training="--var float16=1 --var float16.opt_level=O2"
+train 2 vanilla/submedian_rnddownmix_f16 $data $model $metrics $training "$@"
+
 
 # shorter snippets with trained sharpness?
 
