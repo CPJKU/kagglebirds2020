@@ -154,7 +154,7 @@ def main():
     labelset_ebird = derive_labelset(pd.read_csv(options.train_csv))
 
     # prepare model
-    print("Preparing %d network(s)..." % min(1, len(modelfiles)))
+    print("Preparing %d network(s)..." % max(1, len(modelfiles)))
     # instantiate neural network
     num_classes = len(labelset_ebird)
     models = []
