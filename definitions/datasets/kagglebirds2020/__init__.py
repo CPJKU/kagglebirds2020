@@ -200,9 +200,9 @@ class DownmixChannels(Dataset):
                 if self.axis == -1 or self.axis == len(wav.shape) - 1:
                     wav = np.dot(wav, weights)[..., np.newaxis]
                 else:
-                    weights = weights[(Ellipsis,) +
-                                      (np.newaxis,) *
-                                      (len(wav.shape[self.axis:] - 1))]
+                    weights = weights.reshape(weights.shape +
+                                              (1,) *
+                                              (len(wav.shape[self.axis:]) - 1))
                     wav = (wav * weights).sum(self.axis, keepdims=True)
         item[self.key] = wav
         return item
