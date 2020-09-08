@@ -55,7 +55,7 @@ def opts_parser():
             help='Optional function to apply to --threshold: none or logit '
                  '(to convert probabilities to logits) (default: %(default)s)')
     parser.add_argument('--postprocess',
-            type=str, action='append', choices=('sigmoid',),
+            type=str, action='append', choices=('sigmoid',), default=[],
             help='Postprocessing operation to apply (before bagging), can be '
                  'given multiple times. Choices are: sigmoid')
     parser.add_argument('--cuda-device',
