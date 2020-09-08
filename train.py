@@ -101,6 +101,16 @@ def set_cuda_sync_mode(mode):
         pass
 
 
+def add_optimizer_params(optimizer, scheduler, params, eta_scale=1):
+    """
+    Add a parameter group to the optimizer and scheduler, optionally with a
+    scaled learning rate (relative to the first existing parameter group).
+    """
+    optimizer.add_param_group(dict(
+            params=params, lr=(optimizer.param_groups[0]['lr'] * eta_scale)))
+    scheduler.min_lrs.append(scheduler.min_lrs[0] * eta_scale)
+
+
 def main():
     # parse command line
     parser = opts_parser()
@@ -166,6 +176,15 @@ def main():
 
     # initialize optimizer
     params = model.parameters()
+    if cfg['train.first_params']:
+        first_params_count = cfg['train.first_params']
+        # if a string, treat as a submodule name, figure out its param count
+        if isinstance(first_params_count, str):
+            first_params_count = len(list(getattr(
+                    model, first_params_count).parameters()))
+        # advance the `params` iterator, keep the first parameters separately
+        params = iter(params)
+        first_params = [next(params) for _ in range(first_params_count)]
     optimizer = get_optimizer(cfg, params)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
             optimizer, factor=cfg['train.eta_decay'],
@@ -197,6 +216,10 @@ def main():
         epoch = state.pop('epoch')
         if cfg['float16']:
             amp.load_state_dict(state.pop('amp'))
+        if (cfg['train.first_params'] and
+                epoch > cfg['train.first_params.delay']):
+            add_optimizer_params(optimizer, scheduler, first_params,
+                                 cfg['train.first_params.eta_scale'])
     else:
         history = {}
         epoch = 0
@@ -221,6 +244,15 @@ def main():
     # run training loop
     print("Training:")
     for epoch in range(epoch, cfg['train.epochs']):
+        # add first_params to optimizer when the delay has passed
+        if (cfg['train.first_params'] and
+                cfg['train.first_params.delay'] == epoch):
+            add_optimizer_params(optimizer, scheduler, first_params,
+                                 cfg['train.first_params.eta_scale'])
+            if cfg['debug']:
+                print('Training first %d parameters with learning rate '
+                      'scaled by %f.' % (first_params_count,
+                                         cfg['train.first_params.eta_scale']))
         # training pass
         model.train(True)
         if cfg['debug']:
