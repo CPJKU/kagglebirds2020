@@ -408,7 +408,12 @@ class AverageMetrics(object):
             self.aggregates[key].update(value, denom)
 
     def aggregate(self):
-        return {k: a.result() for k, a in self.aggregates.items()}
+        result = {k: a.result() for k, a in self.aggregates.items()}
+        # XXX: metrics should be able to redefine the aggregate() function
+        if 'prec' in result and 'rec' in result:
+            p, r = result['prec'], result['rec']
+            result['f1'] = Welford._safe_div(2 * p * r, p + r)
+        return result
 
     def __iadd__(self, other):
         self.update(other)
