@@ -189,3 +189,11 @@ for pshift in 10 05 02; do
   training="--var float16=1 --var float16.opt_level=O2"
   train 1 vanilla/submedian_rnddownmix_rndshift${pshift}_f16 $data $model $metrics $training "$@"
 done
+
+# float16 shakeshake with median subtraction and downmix augmentation
+data="--var dataset=kagglebirds2020 --var data.downmix=random_uniform"
+arch="add[shake[conv2d:64@3x3,bn2d,relu,conv2d:64@3x3|conv2d:64@3x3,bn2d,relu,conv2d:64@3x3]|crop2d:2,conv2d:64@1x1],add[bn2d,relu,shake[conv2d:64@3x3,bn2d,relu,conv2d:64@3x3|conv2d:64@3x3,bn2d,relu,conv2d:64@3x3]|crop2d:2],pool2d:max@3x3,add[bn2d,relu,shake[conv2d:128@3x3,bn2d,relu,conv2d:128@3x3|conv2d:128@3x3,bn2d,relu,conv2d:128@3x3]|crop2d:2,conv2d:128@1x1],add[bn2d,relu,shake[conv2d:128@3x3,bn2d,relu,conv2d:128@3x3|conv2d:128@3x3,bn2d,relu,conv2d:128@3x3]|crop2d:2],bn2d,relu,conv2d:128@12x3,bn2d,lrelu,pool2d:max@5x3,conv2d:1024@1x9,bn2d,lrelu,dropout:0.5,conv2d:1024@1x1,bn2d,lrelu,dropout:0.5,conv2d:C@1x1"
+model="--var spect.denoise=submedian --var model.predictor.arch=$arch"
+metrics=
+training="--var float16=1 --var float16.opt_level=O2"
+train 2 shake1/submedian_rnddownmix_f16 $data $model $metrics $training "$@"
