@@ -181,12 +181,11 @@ for ctx in 3 5 7 11 13 15 17; do
   train 1 vanilla/submedian_rnddownmix_ctx${ctx}_f16 $data $model $metrics $training "$@"
 done
 
-# shorter snippets with trained sharpness?
-
-
-# ...
-#data="--var dataset=kagglebirds2020"
-#model="--var model.predictor.arch=conv2d:16@3x3,bn2d,lrelu,..."
-#metrics="..."
-#training="..."
-#train 1 vanilla/defaults $data $model $metrics $training "$@"
+# float16 resnet with median subtraction, downmix augmentation, pitch shifting
+for pshift in 10 05 02; do
+  data="--var dataset=kagglebirds2020 --var data.downmix=random_uniform"
+  model="--var spect.denoise=submedian --var filterbank.random_shift=0.$pshift"
+  metrics=
+  training="--var float16=1 --var float16.opt_level=O2"
+  train 1 vanilla/submedian_rnddownmix_rndshift${pshift}_f16 $data $model $metrics $training "$@"
+done
