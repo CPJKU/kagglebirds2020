@@ -246,18 +246,44 @@ def create_mel_filterbank(sample_rate, frame_len, num_bands, min_freq, max_freq,
 
 
 class MelFilter(Module):
-    def __init__(self, sample_rate, winsize, num_bands, min_freq, max_freq):
+    """
+    Transform a spectrogram created with the given `sample_rate` and `winsize`
+    into a mel spectrogram of `num_bands` from `min_freq` to `max_freq`.
+    Optionally scales `min_freq` and `max_freq` with a random factor between
+    `1 - random_shift` and `1 + random_shift` per batch when training.
+    """
+    def __init__(self, sample_rate, winsize, num_bands, min_freq, max_freq,
+                 random_shift=0):
         super(MelFilter, self).__init__()
         melbank = create_mel_filterbank(sample_rate, winsize, num_bands,
                                         min_freq, max_freq, crop=True)
         self.register_buffer('bank', melbank, persistent=False)
         self._extra_repr = 'num_bands={}, min_freq={}, max_freq={}'.format(
                 num_bands, min_freq, max_freq)
+        self.random_shift = random_shift
+        if self.random_shift:
+            self.sample_rate = sample_rate
+            self.winsize = winsize
+            self.num_bands = num_bands
+            self.min_freq = min_freq
+            self.max_freq = max_freq
+            self._extra_repr += ', random_shift={}'.format(
+                self.random_shift)
 
     def forward(self, x):
+        if not self.random_shift or not self.training:
+            bank = self.bank
+        else:
+            factor = (1.0 - self.random_shift +
+                      2 * np.random.rand() * self.random_shift)
+            bank = create_mel_filterbank(self.sample_rate, self.winsize,
+                                         self.num_bands,
+                                         self.min_freq * factor,
+                                         self.max_freq * factor,
+                                         crop=True).to(x)
         x = x.transpose(-1, -2)  # put fft bands last
-        x = x[..., :self.bank.shape[0]]  # remove unneeded fft bands
-        x = x.matmul(self.bank)  # turn fft bands into mel bands
+        x = x[..., :bank.shape[0]]  # remove unneeded fft bands
+        x = x.matmul(bank)  # turn fft bands into mel bands
         x = x.transpose(-1, -2)  # put time last
         return x
 
@@ -287,7 +313,7 @@ def mel_filterbank(num_channels, num_bands, min_freq, max_freq, hopsize,
     result.add_module('stft', STFT(winsize, hopsize))
     result.add_module('melfilter', MelFilter(cfg['data.sample_rate'], winsize,
                                              num_bands, min_freq * nyquist,
-                                             max_freq * nyquist))
+                                             max_freq * nyquist, **kwargs))
     result.receptive_field = ReceptiveField(winsize, hopsize, 0)
     return result
 
@@ -322,6 +348,7 @@ def create(cfg, shapes, dtypes, num_classes):
     fbargs = {}
     if cfg['filterbank'] == 'mel':
         filterbank = mel_filterbank
+        fbargs.update(random_shift=cfg['filterbank.random_shift'])
     elif cfg['filterbank'] == 'stft':
         filterbank = stft_filterbank
     elif cfg['filterbank'] == 'none':
