@@ -197,3 +197,12 @@ model="--var spect.denoise=submedian --var model.predictor.arch=$arch"
 metrics=
 training="--var float16=1 --var float16.opt_level=O2"
 train 2 shake1/submedian_rnddownmix_f16 $data $model $metrics $training "$@"
+
+# float16 with median subtraction and downmix augmentation, different sharpness
+for alpha in 10 5 0.1; do
+  data="--var dataset=kagglebirds2020 --var data.downmix=random_uniform"
+  model="--var spect.denoise=submedian --var model.global_pool=lme:$alpha"
+  metrics=
+  training="--var float16=1 --var float16.opt_level=O2"
+  train 1 vanilla/submedian_rnddownmix_lme${alpha/./}_f16 $data $model $metrics $training "$@"
+done
