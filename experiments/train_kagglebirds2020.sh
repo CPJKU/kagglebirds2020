@@ -206,3 +206,12 @@ for alpha in 10 5 0.1; do
   training="--var float16=1 --var float16.opt_level=O2"
   train 1 vanilla/submedian_rnddownmix_lme${alpha/./}_f16 $data $model $metrics $training "$@"
 done
+
+# float16 with median subtraction and downmix augmentation on different splits
+for seed in 10 20 30 40; do
+  data="--var dataset=kagglebirds2020 --var data.downmix=random_uniform --var data.split_seed=$seed"
+  model="--var spect.denoise=submedian"
+  metrics=
+  training="--var float16=1 --var float16.opt_level=O2"
+  train 1 vanilla/submedian_rnddownmix_f16_splitseed$seed $data $model $metrics $training "$@"
+done
