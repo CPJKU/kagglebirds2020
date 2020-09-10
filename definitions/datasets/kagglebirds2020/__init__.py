@@ -9,6 +9,7 @@ Author: Jan Schlüter
 import os
 import re
 import glob
+import itertools
 
 import numpy as np
 import pandas as pd
@@ -71,6 +72,28 @@ class BirdcallDataset(Dataset):
                 item[key] = self.annotations[key][idx]
         # return
         return item
+
+
+class NoiseDataset(Dataset):
+    """
+    Dataset of background noise segments given as a list of `wavs` and a list
+    of `(start, length)` segments for each wave file.
+    """
+    def __init__(self, wavs, segments_per_wav, min_length=0):
+        shapes = dict(input=common_shape(wavs))
+        dtypes = dict(input=wavs[0].dtype)
+        segments = [(wav, start, length)
+                    for wav, segments in zip(wavs, segments_per_wav)
+                    for start, length in segments
+                    if length >= min_length]
+        super(NoiseDataset, self).__init__(shapes=shapes, dtypes=dtypes,
+                                           num_classes=0,
+                                           num_items=len(segments))
+        self.segments = segments
+
+    def __getitem__(self, idx):
+        wav, start, length = self.segments[idx]
+        return dict(input=wav[start:start + length])
 
 
 def loop(array, length):
@@ -166,6 +189,37 @@ class Floatify(Dataset):
         return item
 
 
+class MixBackgroundNoise(Dataset):
+    """
+    Dataset wrapper that mixes in background noise from another dataset, with
+    a given probability, and with a uniformly random amount between
+    `min_factor` and `max_factor`.
+    """
+    def __init__(self, dataset, noisedataset, key='input', probability=1,
+                 min_factor=0, max_factor=0.5):
+        super(MixBackgroundNoise, self).__init__(shapes=dataset.shapes,
+                                                 dtypes=dataset.dtypes,
+                                                 num_classes=dataset.num_classes,
+                                                 num_items=len(dataset))
+        self.dataset = dataset
+        self.noisedataset = noisedataset
+        self.key = key
+        self.probability = probability
+        self.min_factor = min_factor
+        self.max_factor = max_factor
+
+    def __getitem__(self, idx):
+        item = dict(self.dataset[idx])
+        if self.probability > 0 and np.random.rand() < self.probability:
+            noise = self.noisedataset[
+                    np.random.randint(len(self.noisedataset))]
+            noise_factor = (self.min_factor + np.random.rand() *
+                            (self.max_factor - self.min_factor))
+            item[self.key] = ((1 - noise_factor) * item[self.key] +
+                         noise_factor * noise[self.key])
+        return item
+
+
 class DownmixChannels(Dataset):
     """
     Dataset wrapper that downmixes multichannel audio to mono, either
@@ -245,6 +299,61 @@ def make_multilabel_target(num_classes, classes):
     target = np.zeros(num_classes, dtype=np.uint8)
     target[classes] = 1
     return target
+
+
+def read_noise_csv(fn, sample_rate, length):
+    """
+    Figure out bird-free portions in a background noise .csv file.
+    """
+    df = pd.read_csv(fn, '\t')
+    if len(df.columns) < 2:
+        df = pd.read_csv(fn, ',')
+    if 'Time (s)' in df and 'Freq (Hz)' in df:
+        # only time points given, assume each call lasts 3s
+        beginnings = df['Time (s)'].values - 1.5
+        endings = beginnings + 1.5
+    elif 'Begin Time (s)' in df and 'End Time (s)' in df:
+        beginnings = df['Begin Time (s)'].values
+        endings = df['End Time (s)'].values
+    else:
+        raise ValueError("Unsupported csv format: %s" % fn)
+    beginnings = (beginnings * sample_rate).astype(np.int)
+    endings = (endings * sample_rate).astype(np.int)
+    # now we know the bird segments. they may overlap or include each other.
+    # we will compute the number of active birds at each change point: each
+    # beginning adds an active bird, each ending subtracts one.
+    beginnings = np.stack((beginnings, np.full_like(beginnings, +1)))
+    endings = np.stack((endings, np.full_like(endings, -1)))
+    changepoints = sorted(map(tuple, itertools.chain(beginnings.T, endings.T)))
+    times, changes = np.asarray([(0, 0)] + changepoints + [(length, 0)]).T
+    num_sources = np.cumsum(changes[:-1])
+    # now we just need to take the segments with zero active birds
+    inactive = np.where(num_sources == 0)[0]
+    beginnings = times[inactive]
+    endings = times[inactive + 1]
+    lengths = endings - beginnings
+    return list(zip(beginnings, lengths))
+
+
+def create_noise_dataset(cfg):
+    """
+    Creates a NoiseDataset instance of sounds with bird-free segments.
+    """
+    here = os.path.dirname(__file__)
+    basedir = os.path.join(here, cfg['data.mix_background_noise.audio_dir'])
+    audio_files = find_files(basedir,
+                             cfg['data.mix_background_noise.audio_regexp'])
+    sample_rate = cfg['data.sample_rate']
+    audios = [audio.WavFile(fn, sample_rate=sample_rate)
+              for fn in tqdm.tqdm(audio_files, 'Reading noise',
+                                  ascii=bool(cfg['tqdm.ascii']))]
+    segment_files = [os.path.splitext(fn)[0] + '.csv' for fn in audio_files]
+    segments = [read_noise_csv(fn, sample_rate, len(wav))
+                if os.path.exists(fn)
+                else [(0, len(wav))]
+                for fn, wav in zip(segment_files, audios)]
+    return NoiseDataset(audios, segments,
+                        min_length=sample_rate * cfg['data.len_min'])
 
 
 def create(cfg, designation):
@@ -374,6 +483,19 @@ def create(cfg, designation):
 
     # convert to float and move channel dimension to the front
     dataset = Floatify(dataset, transpose=True)
+
+    # mix in background noise, if needed
+    if designation == 'train' and cfg['data.mix_background_noise.probability']:
+        noisedataset = create_noise_dataset(cfg)
+        noisedataset = FixedSizeExcerpts(noisedataset,
+                                         int(sample_rate * cfg['data.len_min']),
+                                         deterministic=False)
+        noisedataset = Floatify(noisedataset, transpose=True)
+        dataset = MixBackgroundNoise(
+                dataset, noisedataset,
+                probability=cfg['data.mix_background_noise.probability'],
+                min_factor=cfg['data.mix_background_noise.min_factor'],
+                max_factor=cfg['data.mix_background_noise.max_factor'])
 
     # downmixing, if needed
     if cfg['data.downmix'] != 'none':
