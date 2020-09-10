@@ -194,3 +194,14 @@ def to_float(data, out=None):
     else:
         return np.divide(data, np.iinfo(data.dtype).max, dtype=np.float32,
                          out=out)
+
+
+def normalize(data, low=-1, high=1):
+    """
+    Normalizes audio waveform to the specified range.
+    """
+    data -= np.min(data)
+    data /= np.max(data)
+    data *= (high-low)
+    data += low
+    return data

@@ -38,3 +38,5 @@ In addition, the .csv files need to be named and placed correctly:
 for fn in /share/cp/datasets/birds_kaggle_2020/external/chernobyl/*.txt; do bn="${fn##*/}"; cp -a "$fn" audio/noise/chernobyl/"${bn%%.*}.csv"; done
 for fn in /share/cp/datasets/birds_kaggle_2020/external/birdvox-full-night/*.csv; do bn="${fn##*/}"; cp -a "$fn" audio/noise/birdvox-full-night/"${bn/csv-annotations/flac-audio}"; done
 ```
+
+For mixing in synthetic noise, the `colorednoise` package must be installed.

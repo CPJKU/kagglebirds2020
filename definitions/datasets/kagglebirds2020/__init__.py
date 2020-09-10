@@ -76,16 +76,19 @@ class BirdcallDataset(Dataset):
 
 class NoiseDataset(Dataset):
     """
-    Dataset of background noise segments given as a list of `wavs` and a list
-    of `(start, length)` segments for each wave file.
+    Dataset of noise segments given as a list of `wavs` and an optional
+    list of `(start, length)` segments for each wave file.
     """
-    def __init__(self, wavs, segments_per_wav, min_length=0):
+    def __init__(self, wavs, segments_per_wav=None, min_length=0):
         shapes = dict(input=common_shape(wavs))
         dtypes = dict(input=wavs[0].dtype)
-        segments = [(wav, start, length)
-                    for wav, segments in zip(wavs, segments_per_wav)
-                    for start, length in segments
-                    if length >= min_length]
+        if segments_per_wav is None:
+            segments = [(wav, 0, len(wav)) for wav in wavs]
+        else:
+            segments = [(wav, start, length)
+                        for wav, segments in zip(wavs, segments_per_wav)
+                        for start, length in segments
+                        if length >= min_length]
         super(NoiseDataset, self).__init__(shapes=shapes, dtypes=dtypes,
                                            num_classes=0,
                                            num_items=len(segments))
@@ -356,6 +359,23 @@ def create_noise_dataset(cfg):
                         min_length=sample_rate * cfg['data.len_min'])
 
 
+def create_synthetic_noise_dataset(cfg):
+    """
+    Creates a NoiseDataset instance of sounds with synthetic noise.
+    """
+    from colorednoise import powerlaw_psd_gaussian
+
+    betas = np.linspace(cfg['data.mix_synthetic_noise.min_beta'],
+                        cfg['data.mix_synthetic_noise.max_beta'],
+                        num=cfg['data.mix_synthetic_noise.num_samples'])
+    sample_rate = cfg['data.sample_rate']
+    segment_length = 2 * cfg['data.len_min']
+    wavs = [powerlaw_psd_gaussian(beta, sample_rate * segment_length)
+            for beta in betas]
+    wavs = [audio.normalize(wav, low=-1, high=1) for wav in wavs]
+    return NoiseDataset(wavs)
+
+
 def create(cfg, designation):
     config.add_defaults(cfg, pyfile=__file__)
     here = os.path.dirname(__file__)
@@ -503,6 +523,19 @@ def create(cfg, designation):
                                   method=(cfg['data.downmix']
                                           if designation == 'train'
                                           else 'average'))
+
+    # mix in synthetic (colored) noise, if needed
+    if designation == 'train' and cfg['data.mix_synthetic_noise.probability']:
+        noisedataset = create_synthetic_noise_dataset(cfg)
+        noisedataset = FixedSizeExcerpts(noisedataset,
+                                         int(sample_rate * cfg['data.len_min']),
+                                         deterministic=False)
+        noisedataset = Floatify(noisedataset, transpose=True)
+        dataset = MixBackgroundNoise(
+                dataset, noisedataset,
+                probability=cfg['data.mix_synthetic_noise.probability'],
+                min_factor=cfg['data.mix_synthetic_noise.min_factor'],
+                max_factor=cfg['data.mix_synthetic_noise.max_factor'])
 
     # custom sampling
     if cfg['data.class_sample_weights'] and designation == 'train':
