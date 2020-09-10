@@ -224,7 +224,7 @@ for noise_prob in 0.25 0.5 0.75 1.0; do
   training="--var float16=1 --var float16.opt_level=O2"
   train 1 vanilla/submedian_rnddownmix_noiseprob${noise_prob/./}_f16 $data $model $metrics $training "$@"
 done
-for max_factor in 0.5 0.75 1.0; do
+for max_factor in 0.25 0.5 0.75 1.0; do
   data="--var dataset=kagglebirds2020 --var data.downmix=random_uniform --var data.split_seed=$seed --var data.mix_background_noise.probability=1.0 --var data.mix_background_noise.max_factor=$max_factor"
   model="--var spect.denoise=submedian"
   metrics=
