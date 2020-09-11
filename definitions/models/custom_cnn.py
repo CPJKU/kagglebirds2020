@@ -69,6 +69,7 @@ def custom_cnn(input_channels, specification, input_name='input',
     - globallmepool:<alpha>[t<trainable>][c<channelwise>][e<exponentiated>]
     - bn1d
     - bn2d
+    - groupnorm:<groups>
     - dropout:<drop_probability>
     - relu
     - lrelu
@@ -234,6 +235,9 @@ def custom_cnn(input_channels, specification, input_name='input',
             elif len(layers) >= 2 and hasattr(layers[-2], 'bias'):
                 layers[-2].register_parameter('bias', None)
             layers.append(nn.BatchNorm2d(input_channels))
+        elif kind == 'groupnorm':
+            groups = int(layer_def[1])
+            layers.append(nn.GroupNorm(groups, input_channels))
         elif kind == 'dropout':
             p = float(layer_def[1])
             layers.append(nn.Dropout(p))
