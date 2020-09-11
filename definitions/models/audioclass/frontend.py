@@ -402,6 +402,8 @@ def create(cfg, shapes, dtypes, num_classes):
         network.add_module('norm', TemporalBatchNorm(num_bands))
     elif cfg['spect.norm'] == 'batchnorm_plain':
         network.add_module('norm', TemporalBatchNorm(num_bands, affine=False))
+    elif cfg['spect.norm'] == 'batchnorm2d':
+        network.add_module('norm', nn.BatchNorm2d(num_channels))
     elif cfg['spect.norm'] == 'none':
         pass
     else:
