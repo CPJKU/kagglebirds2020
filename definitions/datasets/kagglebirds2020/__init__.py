@@ -416,7 +416,6 @@ def create(cfg, designation):
         latin_to_ebird = dict(zip(train_csv.primary_label,
                                   train_csv.ebird_code))
 
-
         # constrain .csv rows to selected audio files and vice versa
         csv_ids = set(train_csv.index)
         audio_ids = {get_itemid(fn): fn for fn in audio_files}
@@ -470,6 +469,14 @@ def create(cfg, designation):
             train_csv = train_csv.iloc[valid_idxs]
         if cfg['debug']:
             print("Kept %d items for this split." % len(train_csv))
+
+        # filter by quality rating
+        if cfg['data.min_rating_%s' % designation]:
+            train_csv = train_csv.loc[
+                    train_csv.rating >= cfg['data.min_rating_%s' % designation]]
+            if cfg['debug']:
+                print("Have %d remaining with rating >= %f." %
+                      len(train_csv, cfg['data.min_rating_%s' % designation]))
 
         # update audio_files list to match train_csv
         audio_files = train_csv.audiofile
