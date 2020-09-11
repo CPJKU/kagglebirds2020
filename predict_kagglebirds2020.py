@@ -47,6 +47,15 @@ def opts_parser():
     parser.add_argument('--test-audio',
             type=str,
             help='Directory to find the test audio files in (.mp3 format)')
+    parser.add_argument('--local-then-global',
+            action='store_true', default=False,
+            help='If given, to compute global predictions, first apply the '
+                 'backend to chunks of data.len_max, then apply global max '
+                 'pooling over these chunks.')
+    parser.add_argument('--local-then-global-overlap',
+            type=float, default=0,
+            help='Proportion of overlap of local chunks for --local-then-'
+                 'global, in range [0, 1) (default: %(default)s).')
     parser.add_argument('--threshold',
             type=float, default=0,
             help='Binarization threshold (default: %(default)s)')
@@ -66,25 +75,40 @@ def opts_parser():
     return parser
 
 
-def pool_chunkwise(preds, times, clip_csv, backend):
+def pool_chunkwise(preds, times, backend, chunk_ends, chunk_lens=5):
     chunks = []
-    for site, seconds in zip(clip_csv.site, clip_csv.seconds):
-        if site != 'site_3' and np.isfinite(seconds):
-            start = seconds - 5  # hard-coded for the challenge
-            end = seconds
-            a, b = np.searchsorted(times, [start, end])
-            chunk_preds = preds[..., a:b]
-        else:
-            chunk_preds = preds
+    for start, end in zip(chunk_ends - chunk_lens, chunk_ends):
+        a, b = np.searchsorted(times, [start, end])
+        chunk_preds = preds[..., a:b]
         with torch.no_grad():
             pooled = backend(chunk_preds).detach().cpu().numpy().ravel()
         chunks.append(pooled)
     return np.stack(chunks)
 
 
-def derive_labels(preds, clip_csv, labelset, threshold=0):
+def pool_local_then_global(preds, times, backend, chunk_len, chunk_overlap=0):
+    # compute hop size in seconds from proportion of overlap
+    chunk_hop = chunk_len * (1 - chunk_overlap)
+    # figure out how many windows fully fit into the input
+    num_full_chunks = int((times[-1] - chunk_len) / chunk_hop) + 1
+    # compute their endings, and add one that ends at the end of the input
+    chunk_ends = np.arange(1, num_full_chunks + 2) * chunk_hop
+    chunk_ends[-1] = times[-1]
+    # compute local predictions
+    predictions = pool_chunkwise(preds, times, backend, chunk_ends, chunk_len)
+    # apply max pooling over chunkwise predictions
+    return predictions.max(0, keepdims=True)
+
+
+def pool_global(preds, backend):
+    with torch.no_grad():
+        pooled = backend(preds).detach().cpu().numpy().ravel()
+    return pooled[np.newaxis]
+
+
+def derive_labels(preds, row_ids, labelset, threshold=0):
     chunks = []
-    for row_id, chunk_preds in zip(clip_csv.row_id, preds):
+    for row_id, chunk_preds in zip(row_ids, preds):
         birds = np.where(chunk_preds > threshold)[0]
         birds = ' '.join(labelset[bird] for bird in birds) or 'nocall'
         chunks.append({'row_id': row_id, 'birds': birds})
@@ -201,6 +225,7 @@ def main():
     for audio_id, wav in tqdm.tqdm(batches, 'File ', len(filelist)):
         wav = wav[np.newaxis]  # add batch dimension
         preds_per_model = []
+        clip_csv = test_csv.query("audio_id == '%s'" % audio_id)
         for model, backend in zip(models, backends):
             # pass the batch to the network
             with torch.no_grad():
@@ -219,8 +244,16 @@ def main():
                      sample_rate)
             # we now have preds and matching times for a full audio recording,
             # we need to evaluate it in chunks as specified in test.csv
-            clip_csv = test_csv.query("audio_id == '%s'" % audio_id)
-            preds = pool_chunkwise(preds, times, clip_csv, backend)
+            if (clip_csv.site.values[0] == 'site_3' or
+                    not np.isfinite(clip_csv.seconds.values[0])):
+                if options.local_then_global:
+                    preds = pool_local_then_global(
+                            preds, times, backend, cfg['data.len_max'],
+                            options.local_then_global_overlap)
+                else:
+                    preds = pool_global(preds, backend)
+            else:
+                preds = pool_chunkwise(preds, times, backend, clip_csv.seconds)
             # apply postprocessing
             preds = postprocess(preds, options.postprocess)
             preds_per_model.append(preds)
@@ -229,7 +262,8 @@ def main():
         if len(preds_per_model) > 1:
             preds /= len(preds_per_model)
         # turn probabilities to label lists
-        preds = derive_labels(preds, clip_csv, labelset_ebird, threshold)
+        preds = derive_labels(preds, clip_csv.row_id, labelset_ebird,
+                              threshold)
         predictions.append(preds)
 
     # save predictions
