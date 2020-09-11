@@ -120,6 +120,7 @@ def main():
         if os.path.exists(modelconfigfile(modelfiles[0])):
             options.vars.insert(1, modelconfigfile(modelfiles[0]))
     cfg = config.from_parsed_arguments(options)
+    extra_cfg = config.parse_variable_assignments(options.var)
     if not options.cuda_device:
         device = torch.device('cpu')
     else:
@@ -176,6 +177,7 @@ def main():
             model_cfg = dict(cfg)
             model_cfg.update(config.parse_config_file(
                     modelconfigfile(modelfile)))
+            model_cfg.update(extra_cfg)
             model = get_model(model_cfg, shapes, dtypes, num_classes,
                               options.cuda_device)
             # restore state dict
