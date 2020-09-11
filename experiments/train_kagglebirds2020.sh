@@ -260,3 +260,10 @@ model="--var spect.denoise=submedian"
 metrics=
 training="--var float16=1 --var float16.opt_level=O2"
 train 1 vanilla/submedian_rnddownmix_noiseprob10_noisemaxfact10_samplebalanced_f16 $data $model $metrics $training "$@"
+
+# float16 with median subtraction, downmix augmentation, background noise, 2d batchnorm frontend
+data="--var dataset=kagglebirds2020 --var data.downmix=random_uniform --var data.mix_background_noise.probability=1.0"
+model="--var spect.denoise=submedian --var spect.norm=batchnorm2d"
+metrics=
+training="--var float16=1 --var float16.opt_level=O2"
+train 1 vanilla/submedian_rnddownmix_noiseprob10_noisemaxfact10_frontendbn2d_f16 $data $model $metrics $training "$@"
