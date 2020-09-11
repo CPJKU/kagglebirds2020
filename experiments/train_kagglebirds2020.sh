@@ -238,3 +238,10 @@ model="--var spect.denoise=submedian --var model.predictor.arch=add[conv2d:64@3x
 metrics=
 training="--var float16=1 --var float16.opt_level=O2"
 train 3 resnet1/submedian_rnddownmix_noiseprob10_noisemaxfact10_f16 $data $model $metrics $training "$@"
+
+# float16 with median subtraction, downmix augmentation, background noise, colored noise
+data="--var dataset=kagglebirds2020 --var data.downmix=random_uniform --var data.mix_background_noise.probability=1.0 --var data.mix_background_noise.max_factor=1.0 --var data.mix_synthetic_noise.probability=1.0"
+model="--var spect.denoise=submedian"
+metrics=
+training="--var float16=1 --var float16.opt_level=O2"
+train 1 vanilla/submedian_rnddownmix_noiseprob10_noisemaxfact10_synthnoiseprob10_f16 $data $model $metrics $training "$@"
