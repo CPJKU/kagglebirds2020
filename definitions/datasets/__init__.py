@@ -98,6 +98,8 @@ def get_dataloader(cfg, dataset, designation):
     collate_fn = getattr(dataset, 'collate', None)
     return torch.utils.data.DataLoader(dataset, cfg['batchsize'],
                                        drop_last=(designation == 'train'),
+                                       num_workers=cfg['data.num_workers'],
+                                       pin_memory=bool(cfg['data.pin_memory']),
                                        collate_fn=collate_fn, **kwargs)
 
 
