@@ -265,6 +265,41 @@ class DownmixChannels(Dataset):
         return item
 
 
+class Mixup(Dataset):
+    """
+    Applies Mixup to a dataset, by drawing a second item uniformly at random
+    and mixing the data of all given `keys` between the two with a weight drawn
+    from a Beta distribution with concentration parameter `alpha` (the smaller,
+    the more probable the weight will be near 0.0 or 1.0). Optionally binarizes
+    the data in `binarize_keys` afterwards by setting positive values to 1.
+    """
+    def __init__(self, dataset, keys, binarize_keys=(), alpha=0.3):
+        super(Mixup, self).__init__(
+                shapes=dataset.shapes, dtypes=dataset.dtypes,
+                num_classes=dataset.num_classes, num_items=len(dataset))
+        self.dataset = dataset
+        self.keys = set(keys)
+        self.binarize_keys = set(binarize_keys)
+        self.alpha = alpha
+
+    def __getattr(self, attr):
+        return getattr(self.dataset, attr)
+
+    def __getitem__(self, idx):
+        item1 = self.dataset[idx]
+        item2 = self.dataset[np.random.randint(len(self.dataset))]
+        w1 = np.random.beta(self.alpha, self.alpha)
+        w2 = 1 - w1
+        # use the more highly weighted item as the basis
+        item = dict(item1 if w1 >= w2 else item2)
+        # mix data from the two items
+        for k in self.keys:
+            item[k] = w1 * item1[k] + w2 * item2[k]
+        for k in self.binarize_keys:
+            item[k] = (item[k] > 0.0).astype(item[k].dtype)
+        return item
+
+
 def get_itemid(filename):
     """
     Returns the file name without path and without file extension.
@@ -543,6 +578,14 @@ def create(cfg, designation):
                 probability=cfg['data.mix_synthetic_noise.probability'],
                 min_factor=cfg['data.mix_synthetic_noise.min_factor'],
                 max_factor=cfg['data.mix_synthetic_noise.max_factor'])
+
+    # apply mixup, if needed
+    if designation == 'train' and cfg['data.mixup.apply_to']:
+        dataset = Mixup(
+                dataset, keys=cfg['data.mixup.apply_to'].split(','),
+                binarize_keys=(cfg['data.mixup.binarize'].split(',')
+                               if cfg['data.mixup.binarize'] else ()),
+                alpha=cfg['data.mixup.alpha'])
 
     # custom sampling
     if cfg['data.class_sample_weights'] and designation == 'train':
