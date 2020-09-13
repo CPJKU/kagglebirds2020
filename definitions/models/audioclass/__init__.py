@@ -43,9 +43,9 @@ class AudioClassifier(nn.Module):
         self.output_name = output_name
         if chunk_size and not chunk_overlap:
             rf = self.frontend.receptive_field * self.predictor.receptive_field
-            win_size = rf.size[chunk_axis]
-            hop_size = rf.stride[chunk_axis]
-            padding = rf.padding[chunk_axis]
+            win_size = np.atleast_1d(rf.size)[chunk_axis]
+            hop_size = np.atleast_1d(rf.stride)[chunk_axis]
+            padding = np.atleast_1d(rf.padding)[chunk_axis]
             # chunk size must fit an even number of prediction windows
             num_windows = (chunk_size - win_size) // hop_size + 1
             chunk_size = (num_windows - 1) * hop_size + win_size
@@ -66,7 +66,7 @@ class AudioClassifier(nn.Module):
             yield x
         else:
             rf = self.frontend.receptive_field * self.predictor.receptive_field
-            win_size = rf.size[self.chunk_axis]
+            win_size = np.atleast_1d(rf.size)[self.chunk_axis]
             axis = self.chunk_axis
             if axis < 0:
                 axis += len(x.shape)
