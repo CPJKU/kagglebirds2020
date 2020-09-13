@@ -332,3 +332,12 @@ model="--var spect.denoise=submedian --var model.predictor.arch=$arch --var spec
 metrics=
 training="--var float16=1 --var float16.opt_level=O2"
 train 1 resnet1/submedian_rnddownmix_noiseprob10_noisemaxfact10_groupnorm16_log1px_f16 $data $model $metrics $training "$@"
+
+# pretrained PANN models with downmix augmentation, background noise
+for blocks in 6 5 4 3; do
+  data="--var dataset=kagglebirds2020 --var data.downmix=random_uniform --var data.mix_background_noise.probability=1.0 --var data.mix_background_noise.max_factor=1.0"
+  model="--var model=pann --var model.num_blocks=$blocks"
+  metrics=
+  training=  # STFT does not support float16 with uncommon window lengths
+  train 1 pann/rnddownmix_noiseprob10_noisemaxfact10_blocks$blocks $data $model $metrics $training "$@"
+done

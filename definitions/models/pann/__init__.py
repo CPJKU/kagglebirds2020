@@ -114,7 +114,7 @@ def create(cfg, shapes, dtypes, num_classes):
 
     # create a predictor with the remaining pretrained layers...
     predictor = nn.Sequential()
-    pretrained = pretrained[1:1 + 2 * cfg['model.num_blocks']]
+    pretrained = pretrained[1:2 * cfg['model.num_blocks']]
     for p in pretrained.parameters():
         if p.data.ndim == 4:
             # need to swap time and frequency, PANN has it the other way
