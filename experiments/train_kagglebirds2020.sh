@@ -341,3 +341,10 @@ for blocks in 6 5 4 3; do
   training=  # STFT does not support float16 with uncommon window lengths
   train 1 pann/rnddownmix_noiseprob10_noisemaxfact10_blocks$blocks $data $model $metrics $training "$@"
 done
+for blocks in 6 5 4 3; do
+  data="--var dataset=kagglebirds2020 --var data.downmix=random_uniform --var data.mix_background_noise.probability=1.0 --var data.mix_background_noise.max_factor=1.0"
+  model="--var model=pann --var model.num_blocks=$blocks"
+  metrics=
+  training="--var train.first_params=frontend+predictor.pretrained --var train.first_params.eta_scale=0.01"
+  train 1 pann/rnddownmix_noiseprob10_noisemaxfact10_blocks${blocks}_pannetascale001 $data $model $metrics $training "$@"
+done
