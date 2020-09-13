@@ -16,6 +16,7 @@ import sys
 import time
 from argparse import ArgumentParser
 from collections import OrderedDict
+from functools import reduce
 
 import tqdm
 import numpy as np
@@ -180,8 +181,9 @@ def main():
         first_params_count = cfg['train.first_params']
         # if a string, treat as a submodule name, figure out its param count
         if isinstance(first_params_count, str):
-            first_params_count = len(list(getattr(
-                    model, first_params_count).parameters()))
+            first_params_count = sum(len(list(reduce(getattr, name.split('.'),
+                                                     model).parameters()))
+                                     for name in first_params_count.split('+'))
         # advance the `params` iterator, keep the first parameters separately
         params = iter(params)
         first_params = [next(params) for _ in range(first_params_count)]
