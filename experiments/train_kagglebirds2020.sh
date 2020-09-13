@@ -383,3 +383,10 @@ for bgweight in 0.5 0.75; do
   training="--var float16=1 --var float16.opt_level=O2"
   train 1 vanilla/submedian_rnddownmix_noiseprob10_noisemaxfact10_groupnorm16_bgweight${bgweight/./}_f16 $data $model $metrics $training "$@"
 done
+
+# pretrained PANN model with downmix augmentation, background noise, pitch shifting
+data="--var dataset=kagglebirds2020 --var data.downmix=random_uniform --var data.mix_background_noise.probability=1.0 --var data.mix_background_noise.max_factor=1.0 --var filterbank.random_shift=0.10"
+model="--var model=pann --var model.num_blocks=$blocks"
+metrics=
+training=  # STFT does not support float16 with uncommon window lengths
+train 1 pann/rnddownmix_noiseprob10_noisemaxfact10_blocks6_rndshift10 $data $model $metrics $training "$@"

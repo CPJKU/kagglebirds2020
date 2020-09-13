@@ -90,10 +90,11 @@ def create(cfg, shapes, dtypes, num_classes):
     frontend = nn.Sequential()
     filterbank = nn.Sequential()
     filterbank.add_module('stft', STFT(winsize, hopsize))
-    filterbank.add_module('melfilter', MelFilter(sample_rate, winsize,
-                                                 num_bands=mel_bands,
-                                                 min_freq=50,
-                                                 max_freq=8000))
+    filterbank.add_module('melfilter',
+                          MelFilter(sample_rate, winsize,
+                                    num_bands=mel_bands,
+                                    min_freq=50, max_freq=8000,
+                                    random_shift=cfg['filterbank.random_shift']))
     filterbank.receptive_field = ReceptiveField(winsize, hopsize, 0)
     frontend.add_module('filterbank', filterbank)
     frontend.add_module('magscale', Log1p(a=5))
