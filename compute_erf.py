@@ -91,6 +91,7 @@ def crop_center(img, size):
     Crops out the center of `img` according to the given `size` tuple.
     """
     return img[(Ellipsis,) + tuple(slice((x - s) // 2, (x + s) // 2)
+                                   if s < x else slice(None)
                                    for x, s in zip(img.shape[-len(size):],
                                                    size))]
 
