@@ -6,6 +6,8 @@ Model definitions.
 Author: Jan Schlüter
 """
 import importlib
+from functools import reduce
+import operator
 
 import torch
 import numpy as np
@@ -188,3 +190,16 @@ class ReceptiveField(object):
     def __repr__(self):
         return 'ReceptiveField(size=%s, stride=%s, padding=%s)' % (
                 self.size, self.stride, self.padding)
+
+
+def stack_receptive_fields(modules):
+    """
+    Computes the receptive field of all `modules` applied in sequence. If a
+    module does not have a `receptive_field` attribute, it is assumed to not
+    modify the receptive field.
+    """
+    return reduce(operator.mul,
+                  (module.receptive_field
+                   for module in modules
+                   if hasattr(module, 'receptive_field')),
+                  ReceptiveField())

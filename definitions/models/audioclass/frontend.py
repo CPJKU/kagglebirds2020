@@ -7,15 +7,12 @@ Frontend options shared by the different architectures.
 Author: Jan Schlüter
 """
 
-from functools import reduce
-import operator
-
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .. import ReceptiveField
+from .. import ReceptiveField, stack_receptive_fields
 
 
 if torch.__version__ < '1.6':
@@ -409,10 +406,6 @@ def create(cfg, shapes, dtypes, num_classes):
     else:
         raise ValueError("unknown spect.norm '%s'" % cfg['spect.norm'])
 
-    network.receptive_field = reduce(operator.mul,
-                                     (module.receptive_field
-                                      for module in network.modules()
-                                      if hasattr(module, 'receptive_field')),
-                                     ReceptiveField())
+    network.receptive_field = stack_receptive_fields(network.modules())
 
     return network
