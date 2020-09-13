@@ -238,8 +238,9 @@ def main():
                     preds = preds['output']
             # infer time step for every prediction frame
             rf = model.receptive_field
-            offset = (rf.size[-1] // 2 - rf.padding[-1])
-            stride = rf.stride[-1]
+            offset = (np.atleast_1d(rf.size)[-1] // 2 -
+                      np.atleast_1d(rf.padding)[-1])
+            stride = np.atleast_1d(rf.stride)[-1]
             times = (np.arange(offset, wav.shape[-1] - offset, stride) /
                      sample_rate)
             # we now have preds and matching times for a full audio recording,
