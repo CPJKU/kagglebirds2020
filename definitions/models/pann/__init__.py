@@ -105,7 +105,8 @@ def create(cfg, shapes, dtypes, num_classes):
     pretrained = cnn14_16k()
     if cfg['model.pretrained_weights']:
         state = torch.load(os.path.join(os.path.dirname(__file__),
-                                        cfg['model.pretrained_weights']))
+                                        cfg['model.pretrained_weights']),
+                           map_location='cpu')
         pretrained.load_state_dict(state['model'], strict=False)
         del state
 
