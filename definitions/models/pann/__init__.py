@@ -97,7 +97,8 @@ def create(cfg, shapes, dtypes, num_classes):
                                     random_shift=cfg['filterbank.random_shift']))
     filterbank.receptive_field = ReceptiveField(winsize, hopsize, 0)
     frontend.add_module('filterbank', filterbank)
-    frontend.add_module('magscale', Log1p(a=5))
+    frontend.add_module('magscale', Log1p(a=5,
+                                          trainable=cfg['magscale.trainable']))
     frontend.add_module('adjustment', ScaleShift(9.2, -126))
     frontend.add_module('norm', TemporalBatchNorm(mel_bands))
     frontend.receptive_field = filterbank.receptive_field

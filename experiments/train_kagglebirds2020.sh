@@ -390,3 +390,10 @@ model="--var model=pann --var model.num_blocks=$blocks"
 metrics=
 training=  # STFT does not support float16 with uncommon window lengths
 train 1 pann/rnddownmix_noiseprob10_noisemaxfact10_blocks6_rndshift10 $data $model $metrics $training "$@"
+
+# pretrained PANN model with downmix augmentation, background noise, log1px
+data="--var dataset=kagglebirds2020 --var data.downmix=random_uniform --var data.mix_background_noise.probability=1.0 --var data.mix_background_noise.max_factor=1.0"
+model="--var model=pann --var model.num_blocks=$blocks --var magscale.trainable=1"
+metrics=
+training=  # STFT does not support float16 with uncommon window lengths
+train 1 pann/rnddownmix_noiseprob10_noisemaxfact10_blocks6_log1px $data $model $metrics $training "$@"
