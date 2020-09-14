@@ -34,6 +34,12 @@ def opts_parser():
     parser.add_argument('--train-csv',
             type=str, required=True,
             help='File to read the set of class labels from.')
+    parser.add_argument('--f1-mode',
+            type=str, default='micro', choices=('micro', 'samples'),
+            help='F1 score aggregation: "micro" (default) or "samples"')
+    parser.add_argument('--nocall-class',
+            action='store_true', default=False,
+            help='If given, treat "nocall" as a separate class')
     return parser
 
 
@@ -46,6 +52,8 @@ def main():
 
     # figure out the set of labels
     labelset = derive_labelset(pd.read_csv(options.train_csv))
+    if options.nocall_class:
+        labelset.append('nocall')
     label_to_idx = dict((label, idx) for idx, label in enumerate(labelset))
 
     # read ground truth
@@ -66,7 +74,7 @@ def main():
 
     # evaluate
     p, r, f, _ = sklearn.metrics.precision_recall_fscore_support(
-                gt, pr, average='micro')
+                gt, pr, average=options.f1_mode)
     print('micro-prec', p)
     print('micro-rec', r)
     print('micro-f1', f)
