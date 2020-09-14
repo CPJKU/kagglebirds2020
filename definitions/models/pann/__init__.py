@@ -16,7 +16,8 @@ import torch.nn.functional as F
 from ... import config
 from .. import ReceptiveField, stack_receptive_fields
 from ..audioclass import AudioClassifier
-from ..audioclass.frontend import STFT, MelFilter, Log1p, TemporalBatchNorm
+from ..audioclass.frontend import (STFT, MelFilter, Log1p, TemporalBatchNorm,
+                                   SubtractMedian)
 from ..audioclass import backend
 from ..custom_cnn import custom_cnn
 
@@ -100,6 +101,8 @@ def create(cfg, shapes, dtypes, num_classes):
     frontend.add_module('magscale', Log1p(a=5,
                                           trainable=cfg['magscale.trainable']))
     frontend.add_module('adjustment', ScaleShift(9.2, -126))
+    if cfg['spect.denoise'] == 'submedian':
+        frontend.add_module('denoise', SubtractMedian())
     frontend.add_module('norm', TemporalBatchNorm(mel_bands))
     frontend.receptive_field = filterbank.receptive_field
 
