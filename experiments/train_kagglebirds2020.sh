@@ -438,3 +438,13 @@ for alpha in 0.01 0.05; do
   training=
   train 1 pann/rnddownmix_noiseprob10_noisemaxfact10_blocks6_log1px_lsmooth${alpha/./} $data $model $metrics $training "$@"
 done
+
+# float16 with median subtraction, downmix augmentation, amplitude-controlled background noise, groupnorm
+for max_amp in 1.0 0.75 0.5; do
+  data="--var dataset=kagglebirds2020 --var data.downmix=random_uniform --var data.mix_background_noise.probability=1.0 --var data.mix_background_noise.max_factor=1.0 --var data.mix_background_noise.max_amp=$max_amp"
+  arch="conv2d:64@3x3,groupnorm:16,lrelu,conv2d:64@3x3,groupnorm:16,pool2d:max@3x3,lrelu,conv2d:128@3x3,groupnorm:16,lrelu,conv2d:128@3x3,groupnorm:16,lrelu,conv2d:128@17x3,groupnorm:16,pool2d:max@5x3,lrelu,conv2d:1024@1x9,groupnorm:16,lrelu,dropout:0.5,conv2d:1024@1x1,groupnorm:16,lrelu,dropout:0.5,conv2d:C@1x1"
+  model="--var spect.denoise=submedian --var model.predictor.arch=$arch"
+  metrics=
+  training="--var float16=1 --var float16.opt_level=O2"
+  train 1 vanilla/submedian_rnddownmix_noiseprob10_noisemaxfact10_noisemaxamp${max_amp/./}_groupnorm16_f16 $data $model $metrics $training "$@"
+done
