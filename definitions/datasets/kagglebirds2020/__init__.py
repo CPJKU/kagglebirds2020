@@ -195,11 +195,14 @@ class Floatify(Dataset):
 class MixBackgroundNoise(Dataset):
     """
     Dataset wrapper that mixes in background noise from another dataset, with
-    a given probability, and with a uniformly random amount between
-    `min_factor` and `max_factor`.
+    a given `probability`, and with a uniformly random amount between
+    `min_factor` and `max_factor`. With a given `noise_only_probability`,
+    replaces the input with only noise, and replaces the labels in `label_keys`
+    with zeros.
     """
     def __init__(self, dataset, noisedataset, key='input', probability=1,
-                 min_factor=0, max_factor=0.5):
+                 min_factor=0, max_factor=0.5, noise_only_probability=0,
+                 label_keys=()):
         super(MixBackgroundNoise, self).__init__(shapes=dataset.shapes,
                                                  dtypes=dataset.dtypes,
                                                  num_classes=dataset.num_classes,
@@ -210,10 +213,20 @@ class MixBackgroundNoise(Dataset):
         self.probability = probability
         self.min_factor = min_factor
         self.max_factor = max_factor
+        self.noise_only_probability = noise_only_probability
+        self.label_keys = set(label_keys)
 
     def __getitem__(self, idx):
         item = dict(self.dataset[idx])
-        if self.probability > 0 and np.random.rand() < self.probability:
+        if (self.noise_only_probability > 0 and
+                np.random.rand() < self.noise_only_probability):
+            noise = self.noisedataset[
+                    np.random.randint(len(self.noisedataset))]
+            item[self.key] = noise[self.key]
+            for k in self.label_keys:
+                item[k] = np.zeros_like(item[k])
+        elif self.probability > 0 and (self.probability == 1 or
+                                     np.random.rand() < self.probability):
             noise = self.noisedataset[
                     np.random.randint(len(self.noisedataset))]
             noise_factor = (self.min_factor + np.random.rand() *
@@ -547,7 +560,9 @@ def create(cfg, designation):
     dataset = Floatify(dataset, transpose=True)
 
     # mix in background noise, if needed
-    if designation == 'train' and cfg['data.mix_background_noise.probability']:
+    if (designation == 'train' and
+            (cfg['data.mix_background_noise.probability'] or
+             cfg['data.mix_background_noise.noise_only_probability'])):
         noisedataset = create_noise_dataset(cfg)
         noisedataset = FixedSizeExcerpts(noisedataset,
                                          int(sample_rate * cfg['data.len_min']),
@@ -557,7 +572,9 @@ def create(cfg, designation):
                 dataset, noisedataset,
                 probability=cfg['data.mix_background_noise.probability'],
                 min_factor=cfg['data.mix_background_noise.min_factor'],
-                max_factor=cfg['data.mix_background_noise.max_factor'])
+                max_factor=cfg['data.mix_background_noise.max_factor'],
+                noise_only_probability=cfg['data.mix_background_noise.noise_only_probability'],
+                label_keys=cfg['data.mix_background_noise.noise_only_zero_labels'].split(','))
 
     # downmixing, if needed
     if cfg['data.downmix'] != 'none':
