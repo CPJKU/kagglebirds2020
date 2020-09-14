@@ -149,6 +149,17 @@ def main():
         print("%.3gs per minibatch." % ((t1 - t0) / cfg['benchmark_datafeed']))
         return
 
+    # if told so, play back a given key of the training data as audio
+    if cfg.get('play_datafeed'):
+        import simpleaudio as sa
+        for batch in train_batches:
+            for wav in batch[cfg['play_datafeed']]:
+                if wav.dtype.is_floating_point:
+                    wav = (wav * np.iinfo(np.int16).max).short()
+                sa.WaveObject(wav.cpu().numpy().T.data,
+                              num_channels=wav.shape[0], bytes_per_sample=2,
+                              sample_rate=cfg['data.sample_rate']).play().wait_done()
+
     # prepare validation data generator
     print("Preparing validation data feed...")
     val_data  = get_dataset(cfg, 'valid')
