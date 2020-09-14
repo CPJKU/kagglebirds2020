@@ -178,14 +178,37 @@ class STFT(Module):
                              persistent=False)
         self.complex = complex
 
+    def compute_stft_kernel(self):
+        # use CPU STFT of dirac impulses to derive conv1d weights
+        diracs = torch.eye(self.winsize)
+        w = torch.stft(diracs, self.winsize, self.winsize,
+                       window=self.window.to(diracs), center=False)
+        # squash real/complex, transpose to (1, winsize+2, winsize)
+        w = w.flatten(1).T[:, np.newaxis]
+        return w
+
     def forward(self, x):
         # we want each channel to be treated separately, so we mash
         # up the channels and batch size and split them up afterwards
         batchsize, channels = x.shape[:2]
         x = x.reshape((-1,) + x.shape[2:])
         # we apply the STFT
-        x = torch.stft(x, self.winsize, self.hopsize, window=self.window,
-                       center=False)
+        if not hasattr(self, 'stft_kernel'):
+            try:
+                x = torch.stft(x, self.winsize, self.hopsize,
+                               window=self.window, center=False)
+            except RuntimeError as exc:
+                if len(exc.args) > 0 and "doesn't support" in exc.args[0]:
+                    # half precision STFT not supported everywhere, improvise!
+                    # compute equivalent conv1d weights and register as buffer
+                    self.register_buffer('stft_kernel',
+                                         self.compute_stft_kernel().to(x),
+                                         persistent=False)
+        if hasattr(self, 'stft_kernel'):
+            # we use the improvised version if we found that stft() fails
+            x = F.conv1d(x[:, None], self.stft_kernel, stride=self.hopsize)
+            # split real/complex and move to the end
+            x = x.reshape((batchsize, -1, 2, x.shape[-1])).transpose(-1, -2)
         # we compute magnitudes, if requested
         if not self.complex:
             x = x.norm(p=2, dim=-1)
