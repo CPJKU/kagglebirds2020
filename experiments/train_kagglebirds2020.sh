@@ -430,11 +430,11 @@ for len in 45 60; do
   train 1 vanilla/submedian_rnddownmix_noiseprob10_noisemaxfact10_groupnorm16_len${len}_f16 $data $model $metrics $training "$@"
 done
 
-# float16 pretrained PANN model with downmix augmentation, background noise, log1px, label smoothing
+# pretrained PANN model with downmix augmentation, background noise, log1px, label smoothing
 for alpha in 0.01 0.05; do
   data="--var dataset=kagglebirds2020 --var data.downmix=random_uniform --var data.mix_background_noise.probability=1.0 --var data.mix_background_noise.max_factor=1.0"
   model="--var model=pann --var model.num_blocks=$blocks --var magscale.trainable=1"
   metrics="--var _ce.label_smoothing=$alpha --var _ce.multilabel_dim=1"
-  training="--var float16=1 --var float16.opt_level=O2"
-  train 1 pann/rnddownmix_noiseprob10_noisemaxfact10_blocks6_log1px_lsmooth${alpha/./}_f16 $data $model $metrics $training "$@"
+  training=
+  train 1 pann/rnddownmix_noiseprob10_noisemaxfact10_blocks6_log1px_lsmooth${alpha/./} $data $model $metrics $training "$@"
 done
