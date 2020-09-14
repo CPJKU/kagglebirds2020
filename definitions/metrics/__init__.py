@@ -95,11 +95,14 @@ def print_metrics(prefix, values):
 
 
 def binary_crossentropy(preds, targets, pred_name='output', target_name='mask',
-                        ignore=None, weight_name=None):
+                        ignore=None, weight_name=None, label_smoothing=0,
+                        multilabel_dim=None):
     """
     Computes the binary cross-entropy against the predictions (as logits).
     Will ignore labels of value `ignore` if given and nonnegative. Optionally
-    uses different weights per pixel.
+    uses different weights per pixel, and label smoothing: If `multilabel_dim`
+    is given, interpolates with a uniform distribution over labels, otherwise
+    interpolates with setting all labels to 0.5.
     """
     gt = targets[target_name]
     if ignore is not None and ignore >= 0:
@@ -109,6 +112,10 @@ def binary_crossentropy(preds, targets, pred_name='output', target_name='mask',
     if weight is not None and weight.ndim < gt.ndim:
         # append singleton dimensions to make sure the batch dimensions line up
         weight = weight.view(weight.shape + (1,) * (gt.ndim - weight.ndim))
+    if label_smoothing:
+        uniform = (0.5 if multilabel_dim is None
+                   else 1. / gt.shape[multilabel_dim])
+        gt = label_smoothing * uniform + (1 - label_smoothing) * gt
     not_batch = tuple(range(1, gt.dim()))
     if ignore is not None and ignore >= 0:
         return F.binary_cross_entropy_with_logits(
