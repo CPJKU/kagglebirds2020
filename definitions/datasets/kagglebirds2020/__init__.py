@@ -196,13 +196,15 @@ class MixBackgroundNoise(Dataset):
     """
     Dataset wrapper that mixes in background noise from another dataset, with
     a given `probability`, and with a uniformly random amount between
-    `min_factor` and `max_factor`. With a given `noise_only_probability`,
-    replaces the input with only noise, and replaces the labels in `label_keys`
-    with zeros.
+    `min_factor` and `max_factor`. Optionally the noise is normalized and
+    scaled with a uniformly random value between `min_amp` and `max_amp`.
+    Keeping `max_amp=0` disables normalization and scaling. With a given
+    `noise_only_probability`, replaces the input with only noise, and replaces
+    the labels in `label_keys` with zeros.
     """
     def __init__(self, dataset, noisedataset, key='input', probability=1,
-                 min_factor=0, max_factor=0.5, noise_only_probability=0,
-                 label_keys=()):
+                 min_factor=0, max_factor=0.5, min_amp=0, max_amp=0,
+                 noise_only_probability=0, label_keys=()):
         super(MixBackgroundNoise, self).__init__(shapes=dataset.shapes,
                                                  dtypes=dataset.dtypes,
                                                  num_classes=dataset.num_classes,
@@ -213,26 +215,41 @@ class MixBackgroundNoise(Dataset):
         self.probability = probability
         self.min_factor = min_factor
         self.max_factor = max_factor
+        self.min_amp = min_amp
+        self.max_amp = max_amp
         self.noise_only_probability = noise_only_probability
         self.label_keys = set(label_keys)
+
+    def get_noise(self):
+        # sample noise dataset
+        noise = self.noisedataset[np.random.randint(len(self.noisedataset))]
+        # get out the sound
+        wav = noise[self.key]
+        # normalize and scale, if needed
+        if self.max_amp != 0:
+            if self.min_amp != self.max_amp:
+                factor = (self.min_amp + np.random.rand() *
+                          (self.max_amp - self.min_amp))
+            else:
+                factor = self.min_amp
+            wav = np.asanyarray(wav)
+            max_amplitude = abs(wav).max() or 1
+            wav = wav * (factor / max_amplitude)
+        return wav
 
     def __getitem__(self, idx):
         item = dict(self.dataset[idx])
         if (self.noise_only_probability > 0 and
                 np.random.rand() < self.noise_only_probability):
-            noise = self.noisedataset[
-                    np.random.randint(len(self.noisedataset))]
-            item[self.key] = noise[self.key]
+            item[self.key] = self.get_noise()
             for k in self.label_keys:
                 item[k] = np.zeros_like(item[k])
         elif self.probability > 0 and (self.probability == 1 or
                                      np.random.rand() < self.probability):
-            noise = self.noisedataset[
-                    np.random.randint(len(self.noisedataset))]
             noise_factor = (self.min_factor + np.random.rand() *
                             (self.max_factor - self.min_factor))
             item[self.key] = ((1 - noise_factor) * item[self.key] +
-                         noise_factor * noise[self.key])
+                         noise_factor * self.get_noise())
         return item
 
 
@@ -573,6 +590,8 @@ def create(cfg, designation):
                 probability=cfg['data.mix_background_noise.probability'],
                 min_factor=cfg['data.mix_background_noise.min_factor'],
                 max_factor=cfg['data.mix_background_noise.max_factor'],
+                min_amp=cfg['data.mix_background_noise.min_amp'],
+                max_amp=cfg['data.mix_background_noise.max_amp'],
                 noise_only_probability=cfg['data.mix_background_noise.noise_only_probability'],
                 label_keys=cfg['data.mix_background_noise.noise_only_zero_labels'].split(','))
 
