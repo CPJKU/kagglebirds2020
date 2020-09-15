@@ -6,6 +6,7 @@ Metric function definitions.
 Author: Jan Schlüter
 """
 import functools
+import inspect
 from collections import OrderedDict, defaultdict
 from fnmatch import fnmatchcase
 
@@ -53,6 +54,8 @@ def get_single_metric(cfg, function_name, config_name):
                 kwargs.pop(kw, None)
             else:
                 kwargs[kw] = v
+    if 'cfg' in inspect.signature(metric_fn).parameters:
+        kwargs['cfg'] = cfg
     if not kwargs:
         return metric_fn
     else:
