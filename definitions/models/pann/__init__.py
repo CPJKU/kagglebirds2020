@@ -55,22 +55,27 @@ def conv_block(in_channels, out_channels, pool_size=1):
     return block
 
 
-def cnn14_16k(mel_bins=64):
+def cnn14_16k(mel_bins=64, conv_dropout=0.2):
     """
     Creates a Cnn14_16k-compatible Sequential model (without spectrogramming).
     """
     model = nn.Sequential()
     model.add_module('bn0', nn.BatchNorm2d(mel_bins))
     model.add_module('conv_block1', conv_block(1, 64, 2))
-    model.add_module('dropout1', nn.Dropout(0.2))
+    if conv_dropout:
+        model.add_module('dropout1', nn.Dropout(conv_dropout))
     model.add_module('conv_block2', conv_block(64, 128, 2))
-    model.add_module('dropout2', nn.Dropout(0.2))
+    if conv_dropout:
+        model.add_module('dropout2', nn.Dropout(conv_dropout))
     model.add_module('conv_block3', conv_block(128, 256, 2))
-    model.add_module('dropout3', nn.Dropout(0.2))
+    if conv_dropout:
+        model.add_module('dropout3', nn.Dropout(conv_dropout))
     model.add_module('conv_block4', conv_block(256, 512, 2))
-    model.add_module('dropout4', nn.Dropout(0.2))
+    if conv_dropout:
+        model.add_module('dropout4', nn.Dropout(conv_dropout))
     model.add_module('conv_block5', conv_block(512, 1024, 2))
-    model.add_module('dropout5', nn.Dropout(0.2))
+    if conv_dropout:
+        model.add_module('dropout5', nn.Dropout(conv_dropout))
     model.add_module('conv_block6', conv_block(1024, 2048, 1))
     return model
 
@@ -107,7 +112,7 @@ def create(cfg, shapes, dtypes, num_classes):
     frontend.receptive_field = filterbank.receptive_field
 
     # load the pretrained predictor
-    pretrained = cnn14_16k()
+    pretrained = cnn14_16k(conv_dropout=cfg['model.conv_dropout'])
     if cfg['model.pretrained_weights']:
         state = torch.load(os.path.join(os.path.dirname(__file__),
                                         cfg['model.pretrained_weights']),
