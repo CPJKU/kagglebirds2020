@@ -180,7 +180,7 @@ class Floatify(Dataset):
         self.transpose = transpose
         self.key = key
 
-    def __getattr(self, attr):
+    def __getattr__(self, attr):
         return getattr(self.dataset, attr)
 
     def __getitem__(self, idx):
@@ -219,6 +219,9 @@ class MixBackgroundNoise(Dataset):
         self.max_amp = max_amp
         self.noise_only_probability = noise_only_probability
         self.label_keys = set(label_keys)
+
+    def __getattr__(self, attr):
+        return getattr(self.dataset, attr)
 
     def get_noise(self):
         # sample noise dataset
@@ -271,7 +274,7 @@ class DownmixChannels(Dataset):
         self.axis = axis
         self.method = method
 
-    def __getattr(self, attr):
+    def __getattr__(self, attr):
         return getattr(self.dataset, attr)
 
     def __getitem__(self, idx):
@@ -312,7 +315,7 @@ class Mixup(Dataset):
         self.binarize_keys = set(binarize_keys)
         self.alpha = alpha
 
-    def __getattr(self, attr):
+    def __getattr__(self, attr):
         return getattr(self.dataset, attr)
 
     def __getitem__(self, idx):
