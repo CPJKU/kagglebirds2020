@@ -67,6 +67,15 @@ def opts_parser():
             type=str, action='append', choices=('sigmoid',), default=[],
             help='Postprocessing operation to apply (before bagging), can be '
                  'given multiple times. Choices are: sigmoid')
+    parser.add_argument('--filter-local-by-global',
+            action='store_true', default=False,
+            help='If given, filter local predictions to only contain classes '
+                 'predicted globally.')
+    parser.add_argument('--filtered-threshold',
+            type=float, default=None,
+            help='Optionally use a different (typically lower) binarization '
+                 'threshold for the local predictions if they were filtered '
+                 'by global predictions.')
     parser.add_argument('--cuda-device',
             type=int, action='append', default=[],
             help='If given, run on the given CUDA device (starting with 0). '
@@ -216,8 +225,12 @@ def main():
 
     # configure binarization threshold
     threshold = options.threshold
+    filtered_threshold = (options.filtered_threshold
+                          if options.filtered_threshold is not None
+                          else threshold)
     if options.threshold_convert == 'logit':
         threshold = np.log(threshold / (1 - threshold))
+        filtered_threshold = np.log(filtered_threshold / (1 - filtered_threshold))
 
     # run prediction loop
     print("Predicting:")
@@ -245,16 +258,21 @@ def main():
                      sample_rate)
             # we now have preds and matching times for a full audio recording,
             # we need to evaluate it in chunks as specified in test.csv
-            if (clip_csv.site.values[0] == 'site_3' or
-                    not np.isfinite(clip_csv.seconds.values[0])):
+            only_global = (clip_csv.site.values[0] == 'site_3' or
+                    not np.isfinite(clip_csv.seconds.values[0]))
+            if only_global or options.filter_local_by_global:
                 if options.local_then_global:
-                    preds = pool_local_then_global(
+                    globalpreds = pool_local_then_global(
                             preds, times, backend, cfg['data.len_max'],
                             options.local_then_global_overlap)
                 else:
-                    preds = pool_global(preds, backend)
+                    globalpreds = pool_global(preds, backend)
+            if only_global:
+                preds = globalpreds
             else:
                 preds = pool_chunkwise(preds, times, backend, clip_csv.seconds)
+                if options.filter_local_by_global:
+                    preds = np.concatenate((globalpreds, preds), 0)
             # apply postprocessing
             preds = postprocess(preds, options.postprocess)
             preds_per_model.append(preds)
@@ -262,9 +280,15 @@ def main():
         preds = sum(preds_per_model[1:], preds_per_model[0])
         if len(preds_per_model) > 1:
             preds /= len(preds_per_model)
+        # possibly filter local predictions by global ones
+        if not only_global and options.filter_local_by_global:
+            globalpreds, preds = preds[0], preds[1:]
+            preds[:, (globalpreds < options.threshold)] = -np.inf
+            thr = filtered_threshold
+        else:
+            thr = threshold
         # turn probabilities to label lists
-        preds = derive_labels(preds, clip_csv.row_id, labelset_ebird,
-                              threshold)
+        preds = derive_labels(preds, clip_csv.row_id, labelset_ebird, thr)
         predictions.append(preds)
 
     # save predictions
