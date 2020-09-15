@@ -163,13 +163,21 @@ def apply_to_collection(data, fn):
         return fn(data)
 
 
+def copy_to_device(data, device):
+    """
+    Copies all PyTorch tensors in a nested collection (tuple, list, dict) to
+    the specified device. Returns the new collection.
+    """
+    return apply_to_collection(
+            data, lambda x: x.to(device) if hasattr(x, 'to') else x)
+
+
 def iterate_to_device(iterable, device):
     """
-    Moves all PyTorch tensors in an iterable to the specified device.
+    Copies all PyTorch tensors in an iterable to the specified device.
     """
     for item in iterable:
-        yield apply_to_collection(
-                item, lambda x: x.to(device) if hasattr(x, 'to') else x)
+        yield copy_to_device(item, device)
 
 
 def iterate_data(iterable, device, cfg=None):

@@ -488,3 +488,10 @@ model="--var model=pann --var model.num_blocks=6 --var magscale.trainable=1 --va
 metrics="--var _ce.label_smoothing=0.01 --var _ce.multilabel_dim=1"
 training=
 train 1 pann/rnddownmix_noiseprob10_noisemaxfact10_noisemaxamp10_blocks6_log1px_negprob001_lsmooth001_convdrop0 $data $model $metrics $training "$@"
+
+# pretrained PANN model with downmix augmentation, background noise, log1px, label smoothing, born again
+data="--var dataset=kagglebirds2020 --var data.downmix=random_uniform --var data.mix_background_noise.probability=1.0 --var data.mix_background_noise.max_factor=1.0"
+model="--var model=pann --var model.num_blocks=6 --var magscale.trainable=1"
+metrics="--var metrics=_sig:process_targets,_mix:mix_targets,_ce:multilabel_crossentropy,acc:multilabel_accuracy,acc_fg:categorical_accuracy,map_fg:categorical_mean_average_precision,prec:binary_precision,rec:binary_recall,spec:binary_specificity --var metrics._sig.target_name=teacher.output --var metrics._sig.process=sigmoid --var metrics._sig.skip_missing=1 --var metrics._mix.target_name1=label_all --var metrics._mix.target_name2=teacher.output --var metrics._mix.new_name=ban_labels --var metrics._mix.skip_missing=1 --var metrics._ce.target_name=ban_labels"
+training="--var train.teacher_model=results/kagglebirds2020/pann/rnddownmix_noiseprob10_noisemaxfact10_blocks6_log1px_r1.mdl"
+train 1 pann/rnddownmix_noiseprob10_noisemaxfact10_blocks6_log1px_ban1 $data $model $metrics $training "$@"

@@ -31,6 +31,7 @@ from definitions import (get_dataset,
                          get_optimizer)
 from definitions.datasets import (iterate_infinitely,
                                   iterate_data,
+                                  copy_to_device,
                                   print_data_info)
 from definitions.models import print_model_info, init_model
 from definitions.metrics import AverageMetrics, print_metrics
@@ -181,6 +182,21 @@ def main():
     print(model)
     print_model_info(model)
 
+    if cfg['train.teacher_model']:
+        print("Preparing teacher network...")
+        teacher_modelfile = cfg['train.teacher_model']
+        teacher_device = torch.device(cfg['train.teacher_model.device'] or
+                                      device)
+        teacher_cfg = dict(cfg)
+        teacher_cfg.update(config.parse_config_file(
+                teacher_modelfile.rsplit('.', 1)[0] + '.vars'))
+        teacher_model = get_model(teacher_cfg, train_data.shapes,
+                                  train_data.dtypes, train_data.num_classes,
+                                  teacher_device.index)
+        teacher_model.load_state_dict(torch.load(teacher_modelfile,
+                                                 map_location=teacher_device))
+        teacher_model.train(False)
+
     # obtain cost functions
     train_metrics = get_metrics(cfg, 'train')
     val_metrics = get_metrics(cfg, 'valid')
@@ -209,6 +225,9 @@ def main():
         from apex import amp
         model, optimizer = amp.initialize(model, optimizer,
                                           opt_level=cfg['float16.opt_level'])
+        if cfg['train.teacher_model']:
+            teacher_model = amp.initialize(teacher_model,
+                                           opt_level=cfg['float16.opt_level'])
 
     # initialize tensorboard logger, if requested
     if options.logdir:
@@ -280,8 +299,17 @@ def main():
             batch = next(train_batches)
             # reset gradients
             optimizer.zero_grad()
-            # compute output and error
+            # compute output
             preds = model(batch)
+            # compute born-again output, if needed
+            if cfg['train.teacher_model']:
+                teacher_batch = copy_to_device(batch, teacher_device)
+                with torch.no_grad():
+                    teacher_preds = teacher_model(teacher_batch)
+                teacher_preds = copy_to_device(teacher_preds, device)
+                batch.update(('teacher.' + k, v)
+                             for k, v in teacher_preds.items())
+            # compute training metrics and loss
             metrics = OrderedDict((k, fn(preds, batch))
                                   for k, fn in train_metrics.items())
             loss = extract_loss(metrics)

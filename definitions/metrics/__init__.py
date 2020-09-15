@@ -97,6 +97,59 @@ def print_metrics(prefix, values):
                 print('%s %s: %.3g' % (prefix, k, v))
 
 
+def process_targets(preds, targets, target_name, process, new_name=None,
+                    skip_missing=False):
+    """
+    Applies some postprocessing to the given targets and stores them under
+    the same name or a new name. `process` can currently only be `"sigmoid"`.
+    If `skip_missing` is true-ish, exits silently if the target is missing.
+    """
+    try:
+        data = targets[target_name]
+    except KeyError:
+        if skip_missing:
+            return 0
+        else:
+            raise
+    if process == 'sigmoid':
+        data = torch.sigmoid(data)
+    else:
+        raise ValueError("Unsupported process %r" % process)
+    if new_name is None:
+        new_name = target_name
+    targets[new_name] = data
+    return 0
+
+
+def mix_targets(preds, targets, target_name1, target_name2, weight1=0.5,
+                weight2=0.5, skip_missing=False, new_name=None):
+    """
+    Linearly combines two targets into one, optionally with custom weights,
+    storing it under the name of the first one, unless `new_name` is given.
+    `weight1` and `weight2` can also be keys into `targets`.
+    If `skip_missing` is true-ish, then if the second target is not present,
+    just uses the first one without weighting.
+    """
+    target1 = targets[target_name1]
+    try:
+        target2 = targets[target_name2]
+    except KeyError:
+        if skip_missing:
+            output = target1
+        else:
+            raise
+    else:
+        if isinstance(weight1, str):
+            weight1 = targets[weight1]
+        if isinstance(weight2, str):
+            weight2 = targets[weight2]
+        output = weight1 * target1 + weight2 * target2
+    if new_name is None:
+        new_name = target_name1
+    targets[output_name] = output
+    return 0
+
+
 def binary_crossentropy(preds, targets, pred_name='output', target_name='mask',
                         ignore=None, weight_name=None, label_smoothing=0,
                         multilabel_dim=None):
