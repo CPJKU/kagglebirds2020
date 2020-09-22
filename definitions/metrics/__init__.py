@@ -146,7 +146,7 @@ def mix_targets(preds, targets, target_name1, target_name2, weight1=0.5,
         output = weight1 * target1 + weight2 * target2
     if new_name is None:
         new_name = target_name1
-    targets[output_name] = output
+    targets[new_name] = output
     return 0
 
 

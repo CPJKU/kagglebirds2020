@@ -399,7 +399,7 @@ data="--var dataset=kagglebirds2020 --var data.downmix=random_uniform --var data
 model="--var model=pann --var model.num_blocks=6 --var magscale.trainable=1"
 metrics=
 training=  # STFT does not support float16 with uncommon window lengths
-train 1 pann/rnddownmix_noiseprob10_noisemaxfact10_blocks6_log1px $data $model $metrics $training "$@"
+train 2 pann/rnddownmix_noiseprob10_noisemaxfact10_blocks6_log1px $data $model $metrics $training "$@"
 
 # float16 with median subtraction, downmix augmentation, background noise, groupnorm, smaller freq range
 for min_freq in 27.5 50 100; do
@@ -437,7 +437,7 @@ done
 for alpha in 0.01 0.05; do
   data="--var dataset=kagglebirds2020 --var data.downmix=random_uniform --var data.mix_background_noise.probability=1.0 --var data.mix_background_noise.max_factor=1.0"
   model="--var model=pann --var model.num_blocks=6 --var magscale.trainable=1"
-  metrics="--var _ce.label_smoothing=$alpha --var _ce.multilabel_dim=1"
+  metrics="--var metrics._ce.label_smoothing=$alpha --var metrics._ce.multilabel_dim=1"
   training=
   train 1 pann/rnddownmix_noiseprob10_noisemaxfact10_blocks6_log1px_lsmooth${alpha/./} $data $model $metrics $training "$@"
 done
@@ -475,19 +475,19 @@ for neg_prob in 0.01 0.05; do
   train 1 pann/rnddownmix_noiseprob10_noisemaxfact10_noisemaxamp10_blocks6_log1px_negprob${neg_prob/./} $data $model $metrics $training "$@"
 done
 
-# pretrained PANN model with downmix augmentation, amplitude-controlled background noise, log1px, negative examples, label smoothing
+# pretrained PANN model with downmix augmentation, amplitude-controlled background noise, log1px, negative examples (repetition)
 data="--var dataset=kagglebirds2020 --var data.downmix=random_uniform --var data.mix_background_noise.probability=1.0 --var data.mix_background_noise.max_factor=1.0 --var data.mix_background_noise.noise_only_probability=0.01 --var data.mix_background_noise.max_amp=1.0"
 model="--var model=pann --var model.num_blocks=6 --var magscale.trainable=1"
-metrics="--var _ce.label_smoothing=0.01 --var _ce.multilabel_dim=1"
+metrics=
 training=
-train 1 pann/rnddownmix_noiseprob10_noisemaxfact10_noisemaxamp10_blocks6_log1px_negprob001_lsmooth001 $data $model $metrics $training "$@"
+train 2 pann/rnddownmix_noiseprob10_noisemaxfact10_noisemaxamp10_blocks6_log1px_negprob001 $data $model $metrics $training "$@"
 
-# pretrained PANN model with downmix augmentation, amplitude-controlled background noise, log1px, negative examples, label smoothing, no dropout
+# pretrained PANN model with downmix augmentation, amplitude-controlled background noise, log1px, negative examples, no dropout
 data="--var dataset=kagglebirds2020 --var data.downmix=random_uniform --var data.mix_background_noise.probability=1.0 --var data.mix_background_noise.max_factor=1.0 --var data.mix_background_noise.noise_only_probability=0.01 --var data.mix_background_noise.max_amp=1.0"
 model="--var model=pann --var model.num_blocks=6 --var magscale.trainable=1 --var model.conv_dropout=0"
-metrics="--var _ce.label_smoothing=0.01 --var _ce.multilabel_dim=1"
+metrics=
 training=
-train 1 pann/rnddownmix_noiseprob10_noisemaxfact10_noisemaxamp10_blocks6_log1px_negprob001_lsmooth001_convdrop0 $data $model $metrics $training "$@"
+train 1 pann/rnddownmix_noiseprob10_noisemaxfact10_noisemaxamp10_blocks6_log1px_negprob001_convdrop0 $data $model $metrics $training "$@"
 
 # pretrained PANN model with downmix augmentation, background noise, log1px, label smoothing, born again
 data="--var dataset=kagglebirds2020 --var data.downmix=random_uniform --var data.mix_background_noise.probability=1.0 --var data.mix_background_noise.max_factor=1.0"
