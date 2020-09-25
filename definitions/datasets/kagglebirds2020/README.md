@@ -1,9 +1,12 @@
 Preparation
 -----------
 
-For training, it is strongly advisable to precompute .wav files for all the
+For training, it is currently required to precompute .wav files for all the
 training clips and store them somewhere locally. The `collect_and_convert.sh`
-script helps with this. For example, you could do:
+script helps with this. Assuming you downloaded the official dataset of the
+challenge to `/share/cp/datasets/birds_kaggle_2020/official` and the [extended
+dataset](https://www.kaggle.com/c/birdsong-recognition/discussion/159970) to
+`/share/cp/datasets/birds_kaggle_2020/external/xeno-canto`, you could do:
 
 ```bash
 ln -s /mnt/data/shared/birds_kaggle_2020_wav audio
@@ -26,7 +29,13 @@ ln -s /share/cp/datasets/birds_kaggle_2020/official/train.csv
 ln -s /share/cp/datasets/birds_kaggle_2020/external/xeno-canto/train_extended.csv
 ```
 
-For mixing in background noise, the .wav files need to be precomputed as well:
+For mixing in background noise, the .wav files need to be precomputed as well.
+Assuming you downloaded the [Chernobyl BiVA
+dataset](https://doi.org/10.5285/be5639e9-75e9-4aa3-afdd-65ba80352591) to
+`/share/cp/datasets/birds_kaggle_2020/external/chernobyl` and the
+[BirdVox-full-night dataset](https://zenodo.org/record/1205569) to
+`/share/cp/datasets/birds_kaggle_2020/external/birdvox-full-night`, you could
+do:
 ```bash
 if [ ! -e audio/noise ]; then
 ./collect_and_convert.sh audio/noise/chernobyl /share/cp/datasets/birds_kaggle_2020/external/chernobyl
